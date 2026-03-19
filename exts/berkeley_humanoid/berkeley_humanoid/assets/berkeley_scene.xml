@@ -23,6 +23,6 @@
 
         <geom name="floor" type="plane" size="10 10 0.1" material="grid_mat" condim="3"/>
 
-        <include file="path/to/your/berkeley_humanoid.urdf"/>
+        <include file=berkeley_humanoid_description/urdf/robot.urdf"/>
     </worldbody>
 </mujoco>
