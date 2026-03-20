@@ -1,7 +1,7 @@
 import os
 import mujoco
 from stable_baselines3 import PPO
-from berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from exts.berkeley_humanoid.berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 
 def main():
     # Path to your converted MJCF/XML scene
@@ -32,8 +32,8 @@ def main():
         # Step the environment forward using the chosen action
         obs, reward, terminated, truncated, info = env.step(action)
         
-        if terminated or truncated:
-            obs, info = env.reset()
+        # if terminated or truncated:
+        #     obs, info = env.reset()
 
 if __name__ == "__main__":
     main()

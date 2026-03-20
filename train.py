@@ -2,7 +2,8 @@ import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
-from berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+# from berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from exts.berkeley_humanoid.berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 
 def main():
     # Path to your converted MJCF/URDF file
@@ -32,7 +33,8 @@ def main():
         clip_range=0.2,
         ent_coef=0.005,
         verbose=1,
-        tensorboard_log="./logs/berkeley_ppo_tensorboard/"
+        device="cpu"
+        # tensorboard_log="./logs/berkeley_ppo_tensorboard/"
     )
 
     # Save checkpoints periodically
@@ -44,7 +46,7 @@ def main():
 
     print("[INFO] Starting Training...")
     # 30,000 iterations * 24 steps (from your rsl_rl_cfg.py) = ~720,000 total steps
-    model.learn(total_timesteps=1_000_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=10_000, callback=checkpoint_callback)
     
     print("[INFO] Saving final model...")
     model.save("berkeley_humanoid_final")
