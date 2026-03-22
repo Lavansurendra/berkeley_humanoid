@@ -9,7 +9,7 @@ def main():
     xml_path = "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml"
     
     # Path to the trained model saved by train.py
-    model_path = "berkeley_humanoid_final_1000000.zip"
+    model_path = "berkeley_humanoid_final_100000.zip"
     
     print(f"[INFO] Loading MuJoCo Environment...")
     # Initialize the environment with human render mode so you can see it

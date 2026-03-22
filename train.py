@@ -46,10 +46,10 @@ def main():
 
     print("[INFO] Starting Training...")
     # 30,000 iterations * 24 steps (from your rsl_rl_cfg.py) = ~720,000 total steps
-    model.learn(total_timesteps=10_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=100_000, callback=checkpoint_callback)
     
     print("[INFO] Saving final model...")
-    model.save("berkeley_humanoid_final_10000")
+    model.save("berkeley_humanoid_final_100000")
 
 if __name__ == "__main__":
     main()
