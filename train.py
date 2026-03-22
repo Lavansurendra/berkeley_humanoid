@@ -11,7 +11,7 @@ def main():
     xml_path = "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml"
     
     # Create parallel environments (Number of CPU cores you want to use)
-    num_envs = 20
+    num_envs = 8
     
     print("[INFO] Creating MuJoCo Vectorized Environments...")
     env = make_vec_env(
@@ -46,10 +46,10 @@ def main():
 
     print("[INFO] Starting Training...")
     # 30,000 iterations * 24 steps (from your rsl_rl_cfg.py) = ~720,000 total steps
-    model.learn(total_timesteps=50_000_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=10_000, callback=checkpoint_callback)
     
     print("[INFO] Saving final model...")
-    model.save("berkeley_humanoid_final")
+    model.save("berkeley_humanoid_final_10000")
 
 if __name__ == "__main__":
     main()
