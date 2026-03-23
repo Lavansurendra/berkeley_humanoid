@@ -21,6 +21,13 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         self.kp = 30.0
         self.kd = 2.0
 
+        # Motor Saturation Limits (from config.json)
+        # Order: HR, HAA, HFE, KFE, FFE, FAA
+        self.effort_limits = np.array([
+            20.0, 20.0, 30.0, 30.0, 20.0, 5.0,  # Left Leg
+            20.0, 20.0, 30.0, 30.0, 20.0, 5.0   # Right Leg
+        ], dtype=np.float32)
+
         # Nominal Stance (The Crouch)
         self.nominal_qpos = np.array([
             0.0, 0.0, -0.4, 0.8, -0.4, 0.0,  # Left Leg
@@ -54,9 +61,8 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
             # 3. PD Formula: τ = Kp(target - current) - Kd(velocity)
             tau = self.kp * (target_q - current_q) - self.kd * current_v
             
-            # 4. CLAMP TORQUE: Real motors have a limit (approx 40Nm for this robot)
-            # This prevents the 'Infinite Force' explosion (NaNs)
-            tau = np.clip(tau, -40.0, 40.0)
+            # 4. CLAMP TORQUE: Apply exact hardware limits per joint
+            tau = np.clip(tau, -self.effort_limits, self.effort_limits)
             
             # 5. Apply only to the 12 leg joints
             self.data.qfrc_applied[6:] = tau
