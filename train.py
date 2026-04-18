@@ -2,6 +2,7 @@ import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 # from berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 from exts.berkeley_humanoid.berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 
@@ -17,6 +18,13 @@ def main():
     env = make_vec_env(
         lambda: BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode=None), 
         n_envs=num_envs
+    )
+
+    env = VecNormalize(
+        env,
+        norm_obs=True,     # Normalizes the sensors
+        norm_reward=True,  # Normalizes the rewards (helps value function)
+        clip_obs=10.0      # Clips extreme physics spikes (the "bouncer")
     )
 
     # Initialize PPO Agent 
@@ -50,6 +58,8 @@ def main():
     
     print("[INFO] Saving final model...")
     model.save("berkeley_humanoid_final_100000")
+
+    env.save("vec_normalize.pkl")
 
 if __name__ == "__main__":
     main()
