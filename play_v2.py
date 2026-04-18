@@ -2,8 +2,6 @@ import os
 import sys
 
 # --- WSL2 GRAPHICS FIX (Apply before any other imports) ---
-# 'egl' is the standard for WSL2/WSLg. 
-# If it stays black, change this to 'osmesa' for software rendering.
 os.environ['MUJOCO_GL'] = 'egl' 
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
@@ -12,6 +10,8 @@ import copy
 import time
 import mujoco
 import mujoco.viewer
+# --- NEW IMPORT ---
+from stable_baselines3.common.env_util import make_vec_env
 
 # 1. PATH SETUP
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,20 +37,28 @@ def class_to_dict(obj):
     return result
 
 def play(checkpoint_path):
+
     # --- 1. SETUP ENVIRONMENT ---
     xml_path = os.path.join(current_dir, "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml")
     
-    # We use 'human' render mode for the window
-    base_env = BerkeleyHumanoidMujocoEnvV2(xml_path=xml_path, render_mode=None)
-    env = RSLRL_Bridge(base_env, device="cpu")
+    print("[INFO] Initializing Single Physical Body for Playback...")
+    # Wrap the env in make_vec_env so the Bridge finds .num_envs and batched data
+    vec_env = make_vec_env(
+        lambda: BerkeleyHumanoidMujocoEnvV2(xml_path=xml_path, render_mode=None),
+        n_envs=1
+    )
+
+    # Re-extract the underlying MuJoCo attributes for the viewer to use
+    base_env = vec_env.envs[0].unwrapped
     
-    # Populate observations so the runner can 'see' the sensors during init
+    # Initialize the Bridge with the vectorized wrapper
+    env = RSLRL_Bridge(vec_env, device="cpu")
+    
     print("[INFO] Resetting environment...")
     obs = env.reset()
 
     # --- 2. PREPARE CONFIGURATION ---
     train_cfg_dict = class_to_dict(BerkeleyCfg)
-    # Flatten config for modular rsl_rl
     train_cfg_dict["obs_groups"] = BerkeleyCfg.obs_groups
     train_cfg_dict["num_steps_per_env"] = BerkeleyCfg.num_steps_per_env
     train_cfg_dict["save_interval"] = BerkeleyCfg.runner.save_interval
@@ -60,10 +68,10 @@ def play(checkpoint_path):
     # --- 3. INITIALIZE RUNNER & LOAD POLICY ---
     runner = OnPolicyRunner(env, train_cfg_dict, log_dir=None, device="cpu")
     
-    print(f"[INFO] Loading model weights...")
+    print(f"[INFO] Loading model weights from {checkpoint_path}...")
     runner.load(checkpoint_path)
     policy = runner.get_inference_policy(device="cpu")
-    policy.eval()
+    # No need for policy.eval() here as get_inference_policy handles it
 
     # --- 4. RENDER LOOP ---
     print("[INFO] Launching MuJoCo Viewer. Press ESC to close.")
@@ -77,17 +85,16 @@ def play(checkpoint_path):
             start_time = time.time()
             
             with torch.no_grad():
+                # Pass the actor observations (the 'obs' key) to the policy
                 actions = policy(obs)
             
+            # The bridge now returns 4 items because of the VecEnv wrapper
             obs, rewards, dones, infos = env.step(actions)
             
-            # # If the robot falls (z < 0.3) or time runs out, reset
+            # Reset logic (commented out as per your previous version)
             # if dones.any():
             #     obs = env.reset()
-            #     base_env.data.qpos[2] = 0.9 # Re-lift
-            #     mujoco.mj_forward(base_env.model, base_env.data)
 
-            # Try-except prevents the Segfault when closing the window
             try:
                 viewer.sync()
             except Exception:
@@ -99,7 +106,7 @@ def play(checkpoint_path):
                 time.sleep(0.02 - elapsed)
 
 if __name__ == "__main__":
-    # Check for the model file
+    # Check for the model file (Updated path to reflect Robert's setup if needed)
     model_to_load = os.path.join(current_dir, "logs/berkeley_humanoid_asym/model_49.pt")
     
     if os.path.exists(model_to_load):
