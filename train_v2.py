@@ -3,6 +3,9 @@ import sys
 import torch
 import copy
 
+# --- THE BORROWED PLUMBING ---
+from stable_baselines3.common.env_util import make_vec_env
+
 # 1. PATH SETUP
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -32,11 +35,17 @@ def main():
     # --- 1. SETUP ASSETS ---
     xml_path = os.path.join(current_dir, "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml")
 
-    print("[INFO] Initializing Physical Body (V2 Physics)...")
-    base_env = BerkeleyHumanoidMujocoEnvV2(xml_path=xml_path, render_mode=None)
+    # --- VECTORIZED PHYSICAL BODIES ---
+    print(f"[INFO] Initializing {BerkeleyCfg.env.num_envs} Parallel Physical Bodies (V2 Physics)...")
+    # We use SB3 here to spin up the 8 parallel CPU threads
+    vec_env = make_vec_env(
+        lambda: BerkeleyHumanoidMujocoEnvV2(xml_path=xml_path, render_mode=None),
+        n_envs=BerkeleyCfg.env.num_envs
+    )
 
     print("[INFO] Initializing Sensory Bridge (Asymmetric Layer)...")
-    env = RSLRL_Bridge(base_env, device="cpu")
+    # We pass the vectorized bundle to the bridge instead of a single env
+    env = RSLRL_Bridge(vec_env, device="cpu")
     env.reset()
 
     # --- 2. PREPARE CONFIGURATION ---

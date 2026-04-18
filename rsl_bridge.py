@@ -13,9 +13,8 @@ class RSLRL_Bridge:
     def __init__(self, env, device="cpu"):
         self.env = env
         self.device = device
-        
-        self.num_envs = 1
-        self.num_obs = 35           
+        self.num_envs = self.env.num_envs
+        self.num_obs = 35          
         self.num_privileged_obs = 37 
         self.num_actions = 12
         self.noise_std = 0.05       
@@ -30,15 +29,19 @@ class RSLRL_Bridge:
         self.obs_dict = ObsDict()
 
     def _process_raw_truth(self, raw_truth):
-        """Processes raw MuJoCo data into the grouped dictionary format."""
-        # 1. Critic View (Truth)
-        priv_t = torch.as_tensor(raw_truth, device=self.device).float().unsqueeze(0)
+        """Processes batched MuJoCo data into the grouped dictionary format."""
+        # 1. Critic View (Truth) 
+        # Removed .unsqueeze(0) because raw_truth already has a batch dimension [8, 37]
+        priv_t = torch.as_tensor(raw_truth, device=self.device).float()
 
         # 2. Actor View (Partial + Noise)
-        actor_obs_clean = raw_truth[2:] 
+        # Added ":" to drop the first two X/Y coordinates across ALL 8 environments
+        actor_obs_clean = raw_truth[:, 2:] 
         noise = np.random.normal(0, self.noise_std, size=actor_obs_clean.shape)
         actor_obs_noisy = (actor_obs_clean + noise).astype(np.float32)
-        actor_t = torch.as_tensor(actor_obs_noisy, device=self.device).float().unsqueeze(0)
+        
+        # Removed .unsqueeze(0) here as well
+        actor_t = torch.as_tensor(actor_obs_noisy, device=self.device).float()
         
         # We store them with names matching BerkeleyCfg.obs_groups
         new_obs = ObsDict()
@@ -50,31 +53,34 @@ class RSLRL_Bridge:
         return self.obs_dict
 
     def reset(self):
-        raw_truth, _ = self.env.reset()
+        # SB3's VecEnv returns ONLY the observation array [8, 37], not a tuple!
+        raw_truth = self.env.reset()
         self.obs_dict = self._process_raw_truth(raw_truth)
         # Modular rsl_rl expects the full dict from reset
         return self.obs_dict
 
     def step(self, actions):
-            # 1. Convert action tensor [1, 12] to numpy [12]
-            actions_np = actions.detach().cpu().numpy().squeeze(0)
-            
-            # 2. Step the MuJoCo physics engine
-            raw_truth, reward, term, trunc, _ = self.env.step(actions_np)
-            
-            # 3. Process the new state into our ObsDict
-            self.obs_dict = self._process_raw_truth(raw_truth)
-            
-            # 4. Prepare reward and done as flat [1] tensors
-            rew_t = torch.tensor([reward], device=self.device, dtype=torch.float)
-            # Done is True if the robot falls (term) OR the clock runs out (trunc)
-            done_t = torch.tensor([term or trunc], device=self.device, dtype=torch.bool)
-            
-            # --- THE TIMEOUT FIX ---
-            # 5. Tell the runner exactly *why* the episode ended so it can bootstrap
-            infos = {
-                "time_outs": torch.tensor([trunc], device=self.device, dtype=torch.bool)
-            }
-            
-            # Return infos instead of {}
-            return self.obs_dict, rew_t, done_t, infos
+        # 1. Convert batched action tensor [8, 12] to numpy array (8, 12)
+        # Removed .squeeze(0) so the batch dimension remains intact
+        actions_np = actions.detach().cpu().numpy()
+        
+        # 2. Step the 8 parallel MuJoCo physics engines
+        # SB3 VecEnv returns exactly 4 items (obs, rewards, dones, infos)
+        raw_truth, rewards, dones, infos = self.env.step(actions_np)
+        
+        # 3. Process the batched state into our ObsDict
+        self.obs_dict = self._process_raw_truth(raw_truth)
+        
+        # 4. Prepare reward and done as batched [8] tensors
+        rew_t = torch.tensor(rewards, device=self.device, dtype=torch.float32)
+        done_t = torch.tensor(dones, device=self.device, dtype=torch.bool)
+        
+        # --- THE TIMEOUT FIX FOR VEC ENV ---
+        # 5. infos is a list of 8 dictionaries. We loop through them to find timeouts.
+        timeouts = torch.tensor([
+            info.get("TimeLimit.truncated", False) for info in infos
+        ], device=self.device, dtype=torch.bool)
+        
+        extras = {"time_outs": timeouts}
+        
+        return self.obs_dict, rew_t, done_t, extras
