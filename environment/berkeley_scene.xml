@@ -1,0 +1,44 @@
+<mujoco model="berkeley_humanoid_scene">
+    <option timestep="0.002" gravity="0 0 -9.81" iterations="100" solver="Newton" tolerance="1e-10"/>
+
+    <visual>
+        <rgba fog="0.1 0.2 0.3 1"/>
+        <global offwidth="1920" offheight="1080" elevation="-20" azimuth="120"/>
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.4 0.6 0.8" rgb2="0 0 0" width="512" height="512"/>
+        <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.1 0.2 0.3" rgb2="0.2 0.3 0.4"/>
+        <material name="grid_mat" texture="grid" texrepeat="10 10" texuniform="true" reflectance="0.2"/>
+    </asset>
+
+    <default>
+        <joint armature="0.01" damping="0.5" limited="true"/>
+        <geom friction="2.0 0.1 0.01" solref="0.02 1" solimp="0.5 0.99 0.001"/>
+    </default>
+
+    <worldbody>
+        <light name="sun" directional="true" pos="0 0 10" dir="0 0 -1" castshadow="true" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+        <light name="fill" directional="true" pos="10 10 5" dir="-1 -1 -0.5" castshadow="false" diffuse="0.2 0.2 0.2"/>
+        
+        <geom name="floor" type="plane" size="10 10 0.1" material="grid_mat" condim="4"/>
+    </worldbody>
+
+    <contact>
+        <exclude body1="torso" body2="ll_hr"/>
+        <exclude body1="ll_hr" body2="ll_haa"/>
+        <exclude body1="ll_haa" body2="ll_hfe"/>
+        <exclude body1="ll_hfe" body2="ll_kfe"/>
+        <exclude body1="ll_kfe" body2="ll_ffe"/>
+        <exclude body1="ll_ffe" body2="ll_faa"/>
+
+        <exclude body1="torso" body2="lr_hr"/>
+        <exclude body1="lr_hr" body2="lr_haa"/>
+        <exclude body1="lr_haa" body2="lr_hfe"/>
+        <exclude body1="lr_hfe" body2="lr_kfe"/>
+        <exclude body1="lr_kfe" body2="lr_ffe"/>
+        <exclude body1="lr_ffe" body2="lr_faa"/>
+    </contact>
+
+    <include file="robot.xml"/>
+</mujoco>

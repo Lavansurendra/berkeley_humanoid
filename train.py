@@ -1,55 +1,99 @@
 import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import CheckpointCallback
-# from berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
-from exts.berkeley_humanoid.berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
+from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+
+class HumanoidCheckpointCallback(BaseCallback):
+    def __init__(self, save_freq, save_path, name_prefix="berkeley", verbose=1):
+        super().__init__(verbose)
+        self.save_freq = save_freq # Now interpreted as total timesteps
+        self.save_path = save_path
+        self.name_prefix = name_prefix
+        self.last_time_trigger = 0
+
+    def _on_step(self) -> bool:
+        # Trigger based on total timesteps across all envs
+        if (self.num_timesteps - self.last_time_trigger) >= self.save_freq:
+            self.last_time_trigger = self.num_timesteps
+            
+            step_count = self.num_timesteps
+            path_zip = os.path.join(self.save_path, f"{self.name_prefix}_{step_count}_steps")
+            path_stats = os.path.join(self.save_path, f"{self.name_prefix}_{step_count}_stats.pkl")
+            
+            self.model.save(path_zip)
+            if self.model.get_vec_normalize_env() is not None:
+                self.model.get_vec_normalize_env().save(path_stats)
+            
+            if self.verbose > 0:
+                print(f"[CHECKPOINT] Saved at step {step_count}")
+        return True
 
 def main():
-    # Path to your converted MJCF/URDF file
-    # You need to generate an MJCF that includes the robot and a floor
-    xml_path = "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml"
+    xml_path = "environment/berkeley_scene.xml"
+    num_envs = 4
     
-    # Create parallel environments (Number of CPU cores you want to use)
-    num_envs = 8
+    print("[INFO] Creating Parallel MuJoCo Environments...")
     
-    print("[INFO] Creating MuJoCo Vectorized Environments...")
+
     env = make_vec_env(
-        lambda: BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode=None), 
-        n_envs=num_envs
+        env_id=BerkeleyHumanoidMujocoEnv, 
+        n_envs=num_envs,
+        env_kwargs={"xml_path": xml_path, "render_mode": None},
+        vec_env_cls=SubprocVecEnv
     )
 
-    # Initialize PPO Agent 
-    # Hyperparameters translated roughly from agents/rsl_rl_cfg.py
+    env = VecNormalize(
+        env,
+        norm_obs=True,     
+        norm_reward=True,  
+        clip_obs=10.0      
+    )
+
     print("[INFO] Initializing PPO Agent...")
     model = PPO(
         "MlpPolicy", 
         env, 
-        n_steps=2048,
-        batch_size=256,
-        n_epochs=5,
-        learning_rate=1e-3,
+        n_steps=512,
+        batch_size=128,
+        n_epochs=10,
+        learning_rate=3e-4,
         gamma=0.99,
         clip_range=0.2,
         ent_coef=0.005,
         verbose=1,
         device="cpu"
-        # tensorboard_log="./logs/berkeley_ppo_tensorboard/"
     )
 
-    # Save checkpoints periodically
-    checkpoint_callback = CheckpointCallback(
-        save_freq=100_000, 
-        save_path='./logs/checkpoints/',
+    # 1. Define your paths
+    # Using 'output' as the parent directory we discussed
+    models_dir = "output/models"
+    checkpoints_dir = "output/checkpoints"
+
+    # 2. Ensure the folders exist
+    os.makedirs(models_dir, exist_ok=True)
+    os.makedirs(checkpoints_dir, exist_ok=True)
+
+    # 3. Update the Callback
+    checkpoint_callback = HumanoidCheckpointCallback(
+        save_freq=10000, 
+        save_path=checkpoints_dir, # Points to output/checkpoints
         name_prefix='berkeley_humanoid'
     )
 
     print("[INFO] Starting Training...")
-    # 30,000 iterations * 24 steps (from your rsl_rl_cfg.py) = ~720,000 total steps
     model.learn(total_timesteps=100_000, callback=checkpoint_callback)
-    
+
     print("[INFO] Saving final model...")
-    model.save("berkeley_humanoid_final_100000")
+    # 4. Save to the models folder
+    final_model_path = os.path.join(models_dir, "berkeley_humanoid_final_100000")
+    stats_path = os.path.join(models_dir, "berkeley_humanoid_vecnormalize_100000.pkl")
+
+    model.save(final_model_path)
+    env.save(stats_path)
+
+    print(f"[INFO] Training complete. Files saved in {models_dir}")
 
 if __name__ == "__main__":
     main()

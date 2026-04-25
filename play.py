@@ -1,50 +1,56 @@
 import os
 import time
-import mujoco
 from stable_baselines3 import PPO
-from exts.berkeley_humanoid.berkeley_humanoid.tasks.locomotion.velocity.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
+from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 
 def main():
-    # Path to your converted MJCF/XML scene
-    xml_path = "exts/berkeley_humanoid/berkeley_humanoid/assets/berkeley_scene.xml"
+    # 1. Update the XML path to the new assets folder
+    xml_path = "environment/berkeley_scene.xml"
     
-    # Path to the trained model saved by train.py
-    model_path = "berkeley_humanoid_final_1000000.zip"
+    # 2. Update model paths to point to the new output/models directory
+    models_dir = "output/models"
+    model_name = "berkeley_humanoid_final_10000"
+    
+    model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
+    stats_path = os.path.join(models_dir, "berkeley_humanoid_vecnormalize_10000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
-    # Initialize the environment with human render mode so you can see it
-    env = BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode="human")
     
-    if not os.path.exists(model_path):
-        print(f"[ERROR] Could not find {model_path}. Have you run train.py yet?")
+    # Wrap in DummyVecEnv
+    base_env_fn = lambda: BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode="human")
+    env = DummyVecEnv([base_env_fn])
+    
+    # Load and freeze normalization stats
+    if os.path.exists(stats_path):
+        print(f"[INFO] Loading normalization statistics from {stats_path}...")
+        env = VecNormalize.load(stats_path, env)
+        env.training = False 
+        env.norm_reward = False 
+    else:
+        print(f"[WARNING] Could not find {stats_path}. Performance may be poor!")
+    
+    # Check for model existence (PPO.load expects path without .zip but os.path needs it)
+    if not os.path.exists(model_path + ".zip"):
+        print(f"[ERROR] Could not find {model_path}.zip. Check your output/models folder!")
         return
 
     print(f"[INFO] Loading Trained PPO Policy...")
     model = PPO.load(model_path, env=env)
 
     print("[INFO] Starting Evaluation Loop...")
-    obs, info = env.reset()
+    obs = env.reset()
     
-    # Run the simulation indefinitely so you can watch the robot
+    raw_env = env.venv.envs[0].unwrapped
+    dt = raw_env.model.opt.timestep * 10 
+    
     while True:
-        # 2. START THE STOPWATCH
         start_time = time.time() 
         
-        # The model predicts the best action based on the observation
         action, _states = model.predict(obs, deterministic=True)
-        
-        # Step the environment forward using the chosen action
-        obs, reward, terminated, truncated, info = env.step(action)
-        
-        # if terminated or truncated:
-        #      obs, info = env.reset()
+        obs, reward, done, info = env.step(action)
 
-        # 3. APPLY THE SPEED FIX
-        # Grab the physics timestep (0.002s) and multiply by our 10x decimation (0.02s)
-        dt = env.unwrapped.model.opt.timestep * 10 
         compute_time = time.time() - start_time
-        
-        # If the math finished faster than 0.02s, pause the loop to lock it to real-time
         if compute_time < dt:
             time.sleep(dt - compute_time)
 
