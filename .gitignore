@@ -1,5 +1,20 @@
+# Python / Build
 **/__pycache__/
 *.egg-info
+*.pyc
+
+# Virtual Environments
+venv/
+.env/
+
+# Editor Settings
+.vscode/
+.idea/
+.DS_Store
+
+# Training Outputs (The Heavy Stuff)
+output/
 logs/
-_orbit*
 wandb/
+*.zip
+*.pkl
