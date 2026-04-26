@@ -54,6 +54,9 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
             -0.126    # LR_FAA
         ])
 
+        # Get the ID for the torso body
+        self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'torso')
+
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(self.num_actions,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_obs,), dtype=np.float32)
 
@@ -67,11 +70,38 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         self.step_count = 0
 
     def step(self, action):
+        # --- CURRICULUM TRACKER ---
+        # Track total global steps across all resets to scale the push difficulty
+        if not hasattr(self, 'total_steps'):
+            self.total_steps = 0
+            # Ensure torso ID is grabbed the first time we run a step
+            self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'torso')
+        self.total_steps += 1
+        
+        # --- RANDOMIZED PUSH LOGIC ---
+        # 1. Clear external forces from the previous step
+        self.data.xfrc_applied[self.torso_id, :] = 0.0
+        
+        # 2. 0.5% chance to push per action (~once every 200 steps / 4 seconds)
+        if self.np_random.uniform() < 0.005:
+            # Curriculum scale: Starts at 30N, maxes out at 100N at 1,000,000 steps
+            progress = min(1.0, self.total_steps / 1_000_000.0)
+            current_max_force = 30.0 + (70.0 * progress) 
+            
+            force_x = self.np_random.uniform(-current_max_force, current_max_force)
+            force_y = self.np_random.uniform(-current_max_force, current_max_force)
+            
+            # Apply to Torso (Indices 0, 1 are Fx, Fy)
+            self.data.xfrc_applied[self.torso_id, 0] = force_x
+            self.data.xfrc_applied[self.torso_id, 1] = force_y
+
+        # --- ACTION APPLICATION ---
         # Scale AI output to +/- 0.3 radians around the crouch
         target_q = action * 0.3 + self.nominal_qpos
         
+        # --- PHYSICS LOOP ---
         for _ in range(10):
-            # 1. CRITICAL: Clear all forces before calculating new ones
+            # 1. CRITICAL: Clear all joint forces before calculating new ones
             self.data.qfrc_applied[:] = 0.0
             
             # 2. Get current state (Indices 7+ for pos, 6+ for vel)
@@ -96,7 +126,8 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
             self.viewer.sync()
 
         obs = self._get_obs()
-        # NOTE: a feet_slide_reward is at the bottom of this file, it came from the original Isaac Lab code and is translated to work with MuJoCo's API. You can call it here and add it to the reward if you want to penalize foot sliding.
+        
+        # Base Reward
         reward = 1.0
         
         # Termination: End if torso falls below 0.3m
@@ -117,13 +148,30 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
         
-        # Set to Crouch
-        self.data.qpos[7:] = self.nominal_qpos
-        self.data.qvel[:] = 0.0
+        # 1. Set Torso Position and Orientation
+        # Adjust 0.65 to the height where the feet just touch the ground
+        self.data.qpos[0:3] = [0, 0, 0.55]  # [x, y, z]
+        self.data.qpos[3:7] = [1, 0, 0, 0] # Unit quaternion (upright)
+        
+        # 2. Set Joint Positions (Crouch)
+        # We add a tiny bit of noise so the robot doesn't start in a "mathematically perfect" trap
+        noise = self.np_random.uniform(low=-0.01, high=0.01, size=len(self.nominal_qpos))
+        self.data.qpos[7:] = self.nominal_qpos + noise
+        
+        # 3. Clear velocities (optional noise here too)
+        self.data.qvel[:] = self.np_random.uniform(low=-0.005, high=0.005, size=self.model.nv)
         
         self.step_count = 0
-        mujoco.mj_forward(self.model, self.data)
+        
+        # 4. Settle the Physics
+        # mj_forward just calculates positions. 
+        # mj_step(self.model, self.data) actually runs the solver.
+        # Running 5-10 steps with zero actions lets the robot "land" properly.
+        for _ in range(10):
+            mujoco.mj_step(self.model, self.data)
+            
         return self._get_obs(), {}
+    
 
     def _get_obs(self):
         return np.concatenate([

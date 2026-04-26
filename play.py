@@ -10,14 +10,14 @@ def main():
     
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "berkeley_humanoid_final_10000"
+    model_name = "berkeley_humanoid_final_1000000"
     
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "berkeley_humanoid_vecnormalize_10000.pkl")
+    stats_path = os.path.join(models_dir, "berkeley_humanoid_vecnormalize_1000000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
-    # Wrap in DummyVecEnv
+    # Wrap in BerkeleyHumanoidMujocoEnv and then DummyVecEnv for compatibility with Stable Baselines3
     base_env_fn = lambda: BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode="human")
     env = DummyVecEnv([base_env_fn])
     
