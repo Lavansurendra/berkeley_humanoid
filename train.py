@@ -47,7 +47,7 @@ def linear_schedule(initial_value: float):
 def main():
     # --- CONFIGURATION ---
     xml_path = "environment/berkeley_scene.xml"
-    num_envs = 4
+    num_envs = 10
     total_timesteps = 1_000_000
     
     # Store hyperparams in a dict for W&B tracking
@@ -113,7 +113,7 @@ def main():
     # 2. Setup Callbacks
     # Custom checkpointing for Weights + Normalization Stats
     checkpoint_callback = HumanoidCheckpointCallback(
-        save_freq=10000, 
+        save_freq=100000, 
         save_path=checkpoints_dir,
         name_prefix='berkeley_humanoid'
     )

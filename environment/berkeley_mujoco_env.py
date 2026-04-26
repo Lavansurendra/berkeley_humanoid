@@ -99,8 +99,27 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         # Scale AI output to +/- 0.3 radians around the crouch
         target_q = action * 0.3 + self.nominal_qpos
         
+        # initialize reward value
+        total_reward = 0.0
+
+        # set number of timesteps per action
+        num_timesteps = 25
+
         # --- PHYSICS LOOP ---
-        for _ in range(10):
+        # NOTE: the number set here in this loop in combination with the timestep length set in the berkeley_scene.xml file determines the control frequency of the robot
+            # control frequency = 1 / (length of timestep * number of timesteps per action)
+            # NOTE: the higher the control frequency, the more poses the robot can exist in that are maybe not optimal but feasible for it to maintain because it can issue commands so fast
+        for _ in range(num_timesteps):
+            
+            # calculate reward terms
+            r_alive = alive_reward()
+
+            # reward term weights
+            w_alive = 0.1
+
+            # add to reward
+            total_reward += w_alive*r_alive
+
             # 1. CRITICAL: Clear all joint forces before calculating new ones
             self.data.qfrc_applied[:] = 0.0
             
@@ -122,13 +141,14 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         
         self.step_count += 1
 
+        # TODO: fix this so the rendering speed is independent from the control frequency
         if self.render_mode == "human" and self.viewer:
             self.viewer.sync()
 
         obs = self._get_obs()
         
-        # Base Reward
-        reward = 1.0
+        # # Base Reward
+        # reward = 1.0
         
         # Termination: End if torso falls below 0.3m
         torso_z = self.data.qpos[2] 
@@ -142,7 +162,7 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
             terminated = bool(torso_z < 0.3)
             truncated = self.step_count >= 1000 
         
-        return obs, reward, terminated, truncated, {}
+        return obs, total_reward, terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -203,3 +223,6 @@ def feet_slide_reward(model, data, foot_body_ids, action):
             sliding_penalty += vel_norm
             
     return -sliding_penalty # Negative because it's a penalty
+
+def alive_reward():
+    return 1.0

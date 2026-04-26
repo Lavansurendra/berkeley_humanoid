@@ -14,7 +14,7 @@
 
     <default>
         <joint armature="0.01" damping="0.5" limited="true"/>
-        <geom friction="2.0 0.1 0.01" solref="0.02 1" solimp="0.5 0.99 0.001"/>
+        <geom friction="2.0 0.1 0.01" solref="0.001 1" solimp="0.99 0.99 0.001"/>
     </default>
 
     <worldbody>
