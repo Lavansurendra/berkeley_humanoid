@@ -7,10 +7,11 @@ from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
 
+
 class HumanoidCheckpointCallback(BaseCallback):
     def __init__(self, save_freq, save_path, name_prefix="berkeley", verbose=1):
         super().__init__(verbose)
-        self.save_freq = save_freq 
+        self.save_freq = save_freq # TODO: model weights should be saved once every few epochs, not based on a set number of timesteps
         self.save_path = save_path
         self.name_prefix = name_prefix
         self.last_time_trigger = 0
@@ -46,16 +47,38 @@ def linear_schedule(initial_value: float):
 
 def main():
     # --- CONFIGURATION ---
-    xml_path = "environment/berkeley_scene.xml"
-    num_envs = 10
-    total_timesteps = 1_000_000
+    xml_path = "environment/berkeley_scene.xml" # filepath in the current directory specifying where the .xml file is that defines the world used in every environment
+    num_envs = 20 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
+    total_timesteps_per_env = 250000 # the number of timesteps per environment per training cycle
+    total_timesteps = total_timesteps_per_env * num_envs
     
     # Store hyperparams in a dict for W&B tracking
     config = {
-        "policy_type": "MlpPolicy",
-        "total_timesteps": total_timesteps,
+        "policy_type": "MlpPolicy", # keyword determining what type of neural network architecture you are using, in this case MlpPolicy specifies you are using 2 MLP networks
+            '''
+            
+            '''
+        "total_timesteps": total_timesteps, # this is the total number of timesteps per training cycle (NOT THE NUMBER OF TIMESTEPS TOTAL PER ENVIRONMENT)
+            '''
+            this can be verified by noting that this element of the config dictionary is supplied to the model.learn function call
+            which then supplies this number to the super().learn function call (which calls the .learn method of the OnPolicyAlgorithm class which is a parent class to the PPO class)
+            which then checks to make sure the total number of timesteps that have passed so far is less than this number
+            NOTE: this number is NOT the total number of timesteps per environment, instead it is just the total number of timesteps that will occur in a singel training cycle where 
+            every time all the environments are stepped once in a single iteration of the rollout while loop, 1 timestep times the number of environments running in parallel is added to the counter
+            that is checked to be less than this variable to keep training going
+            '''
         "learning_rate": 3e-4,
-        "n_steps": 2048,
+        "n_steps": 2048, # this is the number of timesteps (NOT TIMES!) per environment per rollout
+            '''
+            this can be verified by noting that this element of the config dictionary is supplied to the PPO function call
+            which then initializes an instance of the PPO class found in the stable_baselines3/ppo/ppo.py file alongside all the attributes and methods of its parent class (the OnPolicyAlgorithm class found in the stable_baselines3/common/on_policy_algorithm.py file).
+            this means that when the model.learn function is called down below, the .learn method of the PPO class is called which then calls the .learn method of the OnPolicyAlgorithm class
+            which then supplies to the collect_rollouts method of the OnPolicyAlgorithm class self.n_steps (.n_steps is the attribute of the OnPolicyAlgorithm class containing this value)
+            which then has a while loop containing all the function calls needed to make everything that happens in each timestep of a rollout happen
+            where one of the things that happens in each iteration is every environment is stepped once and the n_steps variable (from the collect_rollouts function not here) is incremented by 1
+            such that every iteration the condition being checked by the while loop is if n_steps is less than n_rollout_steps which now contains the value stored in this variable 
+            NOTE: the total number of timesteps per rollout can be found by multiplying this number by the number of environments
+            '''
         "batch_size": 128,
         "n_epochs": 10,
         "gamma": 0.99,
