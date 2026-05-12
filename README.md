@@ -52,15 +52,13 @@ NOTE: the environment name (the word that follows -n) in the following command c
 If this works correctly you should see in brackets the name of your conda environment at the start of your next line in the terminal
 
 ### 3. Install dependencies
-The following is all the dependencies you will need to have installed in order to run the code. Ensure you have your conda environment active when you run these lines
+The following is all the dependencies you will need to have installed in order to run the code. Ensure you have your conda environment active when you run the following line:
 
 <pre>
-  # 1. Install RL algorithms, Gymnasium, and MuJoCo bindings
-  pip install stable-baselines3[extra] shimmy[mujoco] gymnasium[mujoco] numpy
-
-  # 2. Install Monitoring, Hardware Diagnostics, and Cloud Logging
-  pip install wandb psutil tensorboard
+  pip install -r setup/requirements.txt
 </pre>
+
+This installs RL algorithms, Gymnasium, and MuJoCo bindings along w/ monitoring / logging utilities. Check [`setup/requirements.txt`](setup/requirements.txt) for the most up-to-date list.
 
 
 ### 4. Cloud Monitoring (Weights & Biases)
@@ -74,6 +72,11 @@ We use Weights & Biases (W&B) to track rewards, hardware utilization (CPU/RAM), 
 
 
 ### 5. Execution
+
+There are two ways in which a training can be executed:
+
+#### Locally
+
 To kick off a training run first you must set the num_envs (which you can set to half the number of threads on your cpu) and total_timesteps in the train.py file. Then, with your conda environment active run:
 
 <pre>
@@ -87,3 +90,6 @@ To see your results you will need to run:
 </pre>
 
 NOTE: Make sure that the model_name and stats_path variable correspond to the model you are running
+
+#### CHTC
+

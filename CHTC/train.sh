@@ -7,8 +7,13 @@ export WANDB_DIR=./output
 
 # 3. Unpack your environment (Assuming you've tarred your conda env)
 # This part depends on how you package your dependencies
-tar -xzf mujoco_env.tar.gz
-export PATH=$PWD/mujoco_env/bin:$PATH
+mkdir -p env
+tar -xzf packed.tar.gz -C env
+source env/bin/activate
+conda-unpack
 
 # 4. Run the training
-python train.py
+pip list
+
+mkdir output
+touch output/dummy.txt 

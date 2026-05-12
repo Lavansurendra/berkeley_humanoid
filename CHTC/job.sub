@@ -1,24 +1,22 @@
-# Name of the log files for the CHTC system itself
 universe = vanilla
 log = job_$(Cluster)_$(Process).log
 error = job_$(Cluster)_$(Process).err
 output = job_$(Cluster)_$(Process).out
 
-# The executable is your shell script
-executable = run_training.sh
+executable = train.sh
 
 # Tell CHTC which files to send to the node
 # You MUST include your environment folder and the python scripts
-transfer_input_files = train.py, environment/, mujoco_env.tar.gz
+transfer_input_files = train.py, environment/, packed.tar.gz
 
 # Tell CHTC to bring the 'output' folder back when finished
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
 transfer_output_files = output/
 
-# Hardware requests (Adjust based on your local test results)
-request_cpus = 4
-request_memory = 8GB
-request_disk = 5GB
+# Hardware requests
+request_cpus = 8
+request_memory = 32GB
+request_disk = 60GB
 
 queue 1
