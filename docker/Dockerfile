@@ -35,7 +35,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 #RUN mv berkeley_humanoid workspace
 
 #WORKDIR workspace
-COPY ../setup/requirements.txt requirements.txt
+COPY ../../setup/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 CMD ["/bin/bash"]
