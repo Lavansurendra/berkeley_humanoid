@@ -60,6 +60,8 @@ The following is all the dependencies you will need to have installed in order t
 
 This installs RL algorithms, Gymnasium, and MuJoCo bindings along w/ monitoring / logging utilities. Check [`setup/requirements.txt`](setup/requirements.txt) for the most up-to-date list.
 
+currently testing sudo ./build/docker.sh - not finalized
+
 
 ### 4. Cloud Monitoring (Weights & Biases)
 We use Weights & Biases (W&B) to track rewards, hardware utilization (CPU/RAM), and to save model checkpoints remotely.
