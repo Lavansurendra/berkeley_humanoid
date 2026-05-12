@@ -40,5 +40,5 @@
         <exclude body1="lr_ffe" body2="lr_faa"/>
     </contact>
 
-    <include file="robot.xml"/>
+    <include file="berkeley_robot.xml"/>
 </mujoco>
