@@ -48,8 +48,11 @@ def linear_schedule(initial_value: float):
 def main():
     # --- CONFIGURATION ---
     xml_path = "environment/berkeley_scene.xml" # filepath in the current directory specifying where the .xml file is that defines the world used in every environment
-    num_envs = 20 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
-    total_timesteps_per_env = 250000 # the number of timesteps per environment per training cycle
+    
+    num_envs = 1
+    total_timesteps_per_env = 2
+    #num_envs = 20 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
+    #total_timesteps_per_env = 250000 # the number of timesteps per environment per training cycle
     total_timesteps = total_timesteps_per_env * num_envs
     
     # Store hyperparams in a dict for W&B tracking

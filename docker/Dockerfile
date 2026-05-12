@@ -30,11 +30,12 @@ RUN ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python && \
 # Upgrade pip
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Clone & setup repo - fixed version per image is standard practice, but ig we'll do this instead
-RUN git clone https://github.com/Lavansurendra/berkeley_humanoid.git
-RUN mv berkeley_humanoid workspace
+## Clone & setup repo - fixed version per image is standard practice, but ig we'll do this instead
+#RUN git clone https://github.com/Lavansurendra/berkeley_humanoid.git
+#RUN mv berkeley_humanoid workspace
 
-WORKDIR workspace
-RUN pip install --no-cache-dir -r setup/requirements.txt
+#WORKDIR workspace
+COPY ../setup/requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 CMD ["/bin/bash"]
