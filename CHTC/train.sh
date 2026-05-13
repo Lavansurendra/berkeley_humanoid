@@ -10,6 +10,6 @@ echo "Environment has the below packages:"
 pip list
 
 echo "Starting training (train.py)..."
-python train.py "@"
+python train.py "$@"
 
 echo "Training complete!"

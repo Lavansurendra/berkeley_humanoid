@@ -30,6 +30,10 @@ RUN ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python && \
 # Upgrade pip
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
+# We copy ONLY the requirements file from your laptop into the image so that the pip install can be run using this cached data unless the file is changed
+COPY setup/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
 # this is a dummy argument that we can use to force the cache to bust and the image to be rebuilt when we want to update the code in the repo, since the code is cloned in the same layer as this argument, any change to this argument will cause the code to be re-cloned and thus updated in the image
 ARG CACHEBUST=1
 
@@ -40,6 +44,6 @@ RUN git clone https://github.com/Lavansurendra/berkeley_humanoid.git && \
 RUN mv berkeley_humanoid workspace
 
 WORKDIR workspace
-RUN pip install --no-cache-dir -r setup/requirements.txt
+
 
 CMD ["/bin/bash"]
