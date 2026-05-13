@@ -11,7 +11,7 @@ request_disk = 60GB
 
 executable = train.sh
 arguments = $(Process)
-#transfer_input_files = environment/, train.py
+transfer_input_files = environment/, train.py
 
 # Retreive training output and local W&B data upon exit
 should_transfer_files = YES
