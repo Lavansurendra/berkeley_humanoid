@@ -1,4 +1,12 @@
+import multiprocessing
 import os
+
+if __name__ == "__main__":
+    try:
+        multiprocessing.set_start_method('fork', force=True)
+    except RuntimeError:
+        pass
+
 import argparse
 import multiprocessing
 import wandb
@@ -198,5 +206,5 @@ def main():
     print(f"[INFO] Training complete. Files saved in {models_dir}")
 
 if __name__ == "__main__":
-    multiprocessing.set_start_method('fork', force=True)
+    # multiprocessing.set_start_method('fork', force=True)
     main()
