@@ -74,38 +74,38 @@ class G1Env(gym.Env):
         # kp and kd setting now done in xml file
         # torque limits now done in xml file using the actuatorfrcrange attribute for each joint which only works when actuator elements corresponding to those joints are created
 
-        # NOTE: these values were taken from the unitree_ros github and will be used in combination with a dt variable to set velocity limits on the motors if neccessary
-        self.velocity_limits = np.array([
-            32.0,  # left_hip_pitch
-            20.0,  # left_hip_roll
-            32.0,  # left_hip_yaw
-            20.0,  # left_knee
-            30.0,  # left_ankle_pitch
-            30.0,  # left_ankle_roll
-            32.0,  # right_hip_pitch
-            20.0,  # right_hip_roll
-            32.0,  # right_hip_yaw
-            20.0,  # right_knee
-            30.0,  # right_ankle_pitch
-            30.0,  # right_ankle_roll
-            32.0,  # waist_yaw
-            30.0,  # waist_roll
-            30.0,  # waist_pitch
-            37.0,  # left_shoulder_pitch
-            37.0,  # left_shoulder_roll
-            37.0,  # left_shoulder_yaw
-            37.0,  # left_elbow
-            37.0,  # left_wrist_roll
-            22.0,  # left_wrist_pitch
-            22.0,  # left_wrist_yaw
-            37.0,  # right_shoulder_pitch
-            37.0,  # right_shoulder_roll
-            37.0,  # right_shoulder_yaw
-            37.0,  # right_elbow
-            37.0,  # right_wrist_roll
-            22.0,  # right_wrist_pitch
-            22.0,  # right_wrist_yaw
-        ], dtype=np.float32)
+        # # NOTE: these values were taken from the unitree_ros github and will be used in combination with a dt variable to set velocity limits on the motors if neccessary
+        # self.velocity_limits = np.array([
+        #     32.0,  # left_hip_pitch
+        #     20.0,  # left_hip_roll
+        #     32.0,  # left_hip_yaw
+        #     20.0,  # left_knee
+        #     30.0,  # left_ankle_pitch
+        #     30.0,  # left_ankle_roll
+        #     32.0,  # right_hip_pitch
+        #     20.0,  # right_hip_roll
+        #     32.0,  # right_hip_yaw
+        #     20.0,  # right_knee
+        #     30.0,  # right_ankle_pitch
+        #     30.0,  # right_ankle_roll
+        #     32.0,  # waist_yaw
+        #     30.0,  # waist_roll
+        #     30.0,  # waist_pitch
+        #     37.0,  # left_shoulder_pitch
+        #     37.0,  # left_shoulder_roll
+        #     37.0,  # left_shoulder_yaw
+        #     37.0,  # left_elbow
+        #     37.0,  # left_wrist_roll
+        #     22.0,  # left_wrist_pitch
+        #     22.0,  # left_wrist_yaw
+        #     37.0,  # right_shoulder_pitch
+        #     37.0,  # right_shoulder_roll
+        #     37.0,  # right_shoulder_yaw
+        #     37.0,  # right_elbow
+        #     37.0,  # right_wrist_roll
+        #     22.0,  # right_wrist_pitch
+        #     22.0,  # right_wrist_yaw
+        # ], dtype=np.float32)
 
         # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
         key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
@@ -175,11 +175,11 @@ class G1Env(gym.Env):
         # set number of timesteps per action
         num_timesteps = 25
 
-        # define the timestep duration (dt) in seconds based on the timestep length defined in the scene.xml file and the number of timesteps we want to run for each action
-        dt = self.model.opt.timestep * num_timesteps
+        # # define the timestep duration (dt) in seconds based on the timestep length defined in the scene.xml file and the number of timesteps we want to run for each action
+        # dt = self.model.opt.timestep * num_timesteps
 
-        # set the maximum allowed change in angle per timestep based on velocity limits and timestep duration (dt)
-        max_delta_q = self.velocity_limits * dt
+        # # set the maximum allowed change in angle per timestep based on velocity limits and timestep duration (dt)
+        # max_delta_q = self.velocity_limits * dt
 
         # --- PHYSICS LOOP ---
         # NOTE: the number set here in this loop in combination with the timestep length set in the scene.xml file determines the control frequency of the robot
@@ -205,12 +205,12 @@ class G1Env(gym.Env):
             # for the unitree we dont need to do PD math as it is done internally in the mujoco xml file using the kp and kd attributes of the actuators
             # but for the berkeley humanoid we had to do the PD math ourselves and apply the resulting torques using qfrc_applied as we didn't use actuator elements            
             
-            # set a limit on the target angular position so that each motor remains within its velocity limits
-            clamped_ctrl = np.clip(target_q, current_q - max_delta_q, current_q + max_delta_q)
+            # # set a limit on the target angular position so that each motor remains within its velocity limits
+            # clamped_ctrl = np.clip(target_q, current_q - max_delta_q, current_q + max_delta_q)
 
             
-            # provide limited target angular positions to the PD controllers in the xml file by writing to mj.ctrl
-            self.data.ctrl[:] = clamped_ctrl
+            # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
+            self.data.ctrl[:] = target_q
 
             # 6. Step physics
             mujoco.mj_step(self.model, self.data)
