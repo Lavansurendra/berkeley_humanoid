@@ -12,7 +12,7 @@ from environment.g1_env import G1Env
 # Dict maintaining a list of environment choices for training, for parsing command-line args
 ENV_LISTS = {
     "G1Env": G1Env,
-    "BerkeleyEnv": BerkeleyHumanoidMujocoEnv
+    "BerkeleyEnv": BerkeleyEnv
 }
 
 class HumanoidCheckpointCallback(BaseCallback):
@@ -56,6 +56,9 @@ def main():
     # --- CONFIGURATION ---
     parser = argparse.ArgumentParser(description="Locomotion Mujoco PPO Training Env")
     
+    # this argument is used to set the seed for the training run which we can use later to reproduce the same tests or potentially to continue training from a previous run by using the same seed and loading the same model weights and normalization stats
+    parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducibility")
+
     # Environment + infrastructure
     parser.add_argument("--xml_path", type=str, default="environment/berkeley_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
     parser.add_argument("--env-id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
@@ -87,9 +90,7 @@ def main():
     # Store hyperparams in a dict for W&B tracking
     config = {
         "policy_type": "MlpPolicy", # keyword determining what type of neural network architecture you are using, in this case MlpPolicy specifies you are using 2 MLP networks
-            '''
-
-            '''
+       
         "total_timesteps": total_timesteps, # this is the total number of timesteps per training cycle (NOT THE NUMBER OF TIMESTEPS TOTAL PER ENVIRONMENT)
             # this can be verified by noting that this element of the config dictionary is supplied to the model.learn function call
             # which then supplies this number to the super().learn function call (which calls the .learn method of the OnPolicyAlgorithm class which is a parent class to the PPO class)
