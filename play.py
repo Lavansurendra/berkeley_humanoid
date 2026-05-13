@@ -2,23 +2,24 @@ import os
 import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
-from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from environment.berkeley_env import BerkeleyEnv
+from environment.g1_env import G1Env
 
 def main():
     # 1. Update the XML path to the new assets folder
-    xml_path = "environment/berkeley_scene.xml"
+    xml_path = "environment/g1_scene.xml"
     
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "berkeley_humanoid_final_5000000"
+    model_name = "g1_final_400000"
     
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "berkeley_humanoid_vecnormalize_5000000.pkl")
+    stats_path = os.path.join(models_dir, "g1_vecnormalize_400000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
-    # Wrap in BerkeleyHumanoidMujocoEnv and then DummyVecEnv for compatibility with Stable Baselines3
-    base_env_fn = lambda: BerkeleyHumanoidMujocoEnv(xml_path=xml_path, render_mode="human")
+    # Wrap in G1Env and then DummyVecEnv for compatibility with Stable Baselines3
+    base_env_fn = lambda: G1Env(xml_path=xml_path, render_mode="human")
     env = DummyVecEnv([base_env_fn])
     
     # Load and freeze normalization stats

@@ -5,11 +5,11 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
-from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
-
+from environment.berkeley_env import BerkeleyEnv
+from environment.g1_env import G1Env
 
 class HumanoidCheckpointCallback(BaseCallback):
-    def __init__(self, save_freq, save_path, name_prefix="berkeley", verbose=1):
+    def __init__(self, save_freq, save_path, name_prefix="g1", verbose=1):
         super().__init__(verbose)
         self.save_freq = save_freq # TODO: model weights should be saved once every few epochs, not based on a set number of timesteps
         self.save_path = save_path
@@ -47,9 +47,9 @@ def linear_schedule(initial_value: float):
 
 def main():
     # --- CONFIGURATION ---
-    xml_path = "environment/berkeley_scene.xml" # filepath in the current directory specifying where the .xml file is that defines the world used in every environment
-    num_envs = 4 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
-    total_timesteps_per_env = 250000 # the number of timesteps per environment per training cycle
+    xml_path = "environment/g1_scene.xml" # filepath in the current directory specifying where the .xml file is that defines the world used in every environment
+    num_envs = 20 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
+    total_timesteps_per_env = 20000 # the number of timesteps per environment per training cycle
     total_timesteps = total_timesteps_per_env * num_envs
     
     # Store hyperparams in a dict for W&B tracking
@@ -91,7 +91,7 @@ def main():
 
     print("[INFO] Creating Parallel MuJoCo Environments...")
     env = make_vec_env(
-        env_id=BerkeleyHumanoidMujocoEnv, 
+        env_id=G1Env, 
         n_envs=num_envs,
         env_kwargs={"xml_path": xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv
@@ -132,7 +132,7 @@ def main():
     checkpoint_callback = HumanoidCheckpointCallback(
         save_freq=100000, 
         save_path=checkpoints_dir,
-        name_prefix='berkeley_humanoid'
+        name_prefix='g1'
     )
 
     # W&B callback for system metrics (psutil) and gradient tracking
@@ -151,8 +151,8 @@ def main():
     )
 
     print("[INFO] Saving final model...")
-    final_model_path = os.path.join(models_dir, f"berkeley_humanoid_final_{total_timesteps}")
-    stats_path = os.path.join(models_dir, f"berkeley_humanoid_vecnormalize_{total_timesteps}.pkl")
+    final_model_path = os.path.join(models_dir, f"g1_final_{total_timesteps}")
+    stats_path = os.path.join(models_dir, f"g1_vecnormalize_{total_timesteps}.pkl")
 
     model.save(final_model_path)
     env.save(stats_path)
