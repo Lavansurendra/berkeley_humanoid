@@ -12,4 +12,4 @@ pip list
 echo "Starting training (train.py)..."
 python train.py
 
-#DUMMY output!
+echo "Training complete!"
