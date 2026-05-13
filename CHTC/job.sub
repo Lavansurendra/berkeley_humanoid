@@ -1,0 +1,21 @@
+container_image = docker://djb119/locomotion:v1.1
+universe = container
+
+log = $(Cluster).$(Process).log
+error = $(Cluster).$(Process).err
+output = $(Cluster).$(Process).out
+
+request_cpus = 8
+request_memory = 32GB
+request_disk = 60GB
+
+executable = train.sh
+arguments = $(Process)
+transfer_input_files = ../environment/, ../train.py
+
+# Retreive training output and local W&B data upon exit
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_output_files = output/
+
+queue 1

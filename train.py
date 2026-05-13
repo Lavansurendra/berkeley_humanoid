@@ -1,4 +1,5 @@
 import os
+import argparse
 import wandb
 from wandb.integration.sb3 import WandbCallback
 from stable_baselines3 import PPO
@@ -7,6 +8,12 @@ from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from environment.berkeley_env import BerkeleyEnv
 from environment.g1_env import G1Env
+
+# Dict maintaining a list of environment choices for training, for parsing command-line args
+ENV_LISTS = {
+    "G1Env": G1Env,
+    "BerkeleyEnv": BerkeleyHumanoidMujocoEnv
+}
 
 class HumanoidCheckpointCallback(BaseCallback):
     def __init__(self, save_freq, save_path, name_prefix="g1", verbose=1):
@@ -47,15 +54,42 @@ def linear_schedule(initial_value: float):
 
 def main():
     # --- CONFIGURATION ---
-    xml_path = "environment/g1_scene.xml" # filepath in the current directory specifying where the .xml file is that defines the world used in every environment
-    num_envs = 20 # the number of environments that will be running in parallel (set this to the number of threads (logical cores) on your computer)
-    total_timesteps_per_env = 20000 # the number of timesteps per environment per training cycle
-    total_timesteps = total_timesteps_per_env * num_envs
+    parser = argparse.ArgumentParser(description="Locomotion Mujoco PPO Training Env")
+    
+    # Environment + infrastructure
+    parser.add_argument("--xml_path", type=str, default="environment/berkeley_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
+    parser.add_argument("--env-id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
+    
+    parser.add_argument("--num_envs", type=int, default=20, help="Number of environments to run in parallel (set to # of logical cores on your machine)")
+    parser.add_argument("--timesteps_per_env", type=int, default=20000, help="# of timesteps per environment per training cycle")
+    
+    # Hyperparams
+    #parser.add_argument("--policy_type", type=str, default="MlpPolicy", help="NN architecture (e.g., MlpPolicy)")
+    parser.add_argument("--learning_rate", type=float, default=3e-4, help="Initial learning rate")
+    parser.add_argument("--n_steps", type=int, default=2048, help="# of timeSTEPS (NOT TIMES!) per environment per rollout")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
+    parser.add_argument("--n_epochs", type=int, default=10, help="# of epochs")
+    parser.add_argument("--gamma", type=float, default=0.99, help="???") # TODO: add brief explanation at some point
+    
+    # Callbacks, wandb logging
+    parser.add_argument("--save_freq", type=int, default=100000, help="Checkpoint frequency in total timesteps")
+    parser.add_argument("--project_name", type=str, default="wiscohumanoids", help="W&B project name")
+
+    args = parser.parse_args()
+
+    print("[INFO] Starting training with the following configuration:")
+    for arg in vars(args):
+        print(f"[INFO] {arg}: {getattr(args, arg)}")
+
+    # Calculate total timesteps based on arguments
+    total_timesteps = args.timesteps_per_env * args.num_envs
     
     # Store hyperparams in a dict for W&B tracking
     config = {
         "policy_type": "MlpPolicy", # keyword determining what type of neural network architecture you are using, in this case MlpPolicy specifies you are using 2 MLP networks
-        
+            '''
+
+            '''
         "total_timesteps": total_timesteps, # this is the total number of timesteps per training cycle (NOT THE NUMBER OF TIMESTEPS TOTAL PER ENVIRONMENT)
             # this can be verified by noting that this element of the config dictionary is supplied to the model.learn function call
             # which then supplies this number to the super().learn function call (which calls the .learn method of the OnPolicyAlgorithm class which is a parent class to the PPO class)
@@ -63,8 +97,8 @@ def main():
             # NOTE: this number is NOT the total number of timesteps per environment, instead it is just the total number of timesteps that will occur in a singel training cycle where 
             # every time all the environments are stepped once in a single iteration of the rollout while loop, 1 timestep times the number of environments running in parallel is added to the counter
             # that is checked to be less than this variable to keep training going
-        "learning_rate": 3e-4,
-        "n_steps": 2048, # this is the number of timesteps (NOT TIMES!) per environment per rollout
+        "learning_rate": args.learning_rate,
+        "n_steps": args.n_steps, # this is the number of timesteps (NOT TIMES!) per environment per rollout
             # this can be verified by noting that this element of the config dictionary is supplied to the PPO function call
             # which then initializes an instance of the PPO class found in the stable_baselines3/ppo/ppo.py file alongside all the attributes and methods of its parent class (the OnPolicyAlgorithm class found in the stable_baselines3/common/on_policy_algorithm.py file).
             # this means that when the model.learn function is called down below, the .learn method of the PPO class is called which then calls the .learn method of the OnPolicyAlgorithm class
@@ -73,35 +107,35 @@ def main():
             # where one of the things that happens in each iteration is every environment is stepped once and the n_steps variable (from the collect_rollouts function not here) is incremented by 1
             # such that every iteration the condition being checked by the while loop is if n_steps is less than n_rollout_steps which now contains the value stored in this variable 
             # NOTE: the total number of timesteps per rollout can be found by multiplying this number by the number of environments
-        "batch_size": 128,
-        "n_epochs": 10,
-        "gamma": 0.99,
-        "num_envs": num_envs,
+        "batch_size": args.batch_size,
+        "n_epochs": args.n_epochs,
+        "gamma": args.gamma,
+        "num_envs": args.num_envs,
     }
 
     # 1. Initialize Weights & Biases
     # This will prompt you to log in the first time you run it locally.
     run = wandb.init(
-        project="wiscohumanoids",
+        project=args.project_name,
         config=config,
         sync_tensorboard=True,  # This tells W&B to mirror your TensorBoard logs
         monitor_gym=True,       # Auto-upload videos if you use a RecordVideo wrapper
         save_code=True,         # Keeps a snapshot of this script on the cloud
     )
 
-    print("[INFO] Creating Parallel MuJoCo Environments...")
+    print(f"[INFO] Creating {args.num_envs} Parallel MuJoCo Environments...")
     env = make_vec_env(
-        env_id=G1Env, 
-        n_envs=num_envs,
-        env_kwargs={"xml_path": xml_path, "render_mode": None},
+        env_id=ENV_LISTS[args.env_id], 
+        n_envs=args.num_envs,
+        env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv
     )
 
     env = VecNormalize(
         env,
-        norm_obs=True,     
-        norm_reward=True,  
-        clip_obs=10.0      
+        norm_obs=True, 
+        norm_reward=True, 
+        clip_obs=10.0
     )
 
     print("[INFO] Initializing PPO Agent...")
@@ -130,7 +164,7 @@ def main():
     # 2. Setup Callbacks
     # Custom checkpointing for Weights + Normalization Stats
     checkpoint_callback = HumanoidCheckpointCallback(
-        save_freq=100000, 
+        save_freq=args.save_freq, 
         save_path=checkpoints_dir,
         name_prefix='g1'
     )
@@ -144,7 +178,7 @@ def main():
     # Combine them into a single list
     callback_list = CallbackList([checkpoint_callback, wandb_callback])
 
-    print("[INFO] Starting Training...")
+    print(f"[INFO] Starting Training for {total_timesteps} total timesteps...")
     model.learn(
         total_timesteps=config["total_timesteps"], 
         callback=callback_list
