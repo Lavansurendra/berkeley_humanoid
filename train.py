@@ -1,5 +1,6 @@
 import os
 import argparse
+import multiprocessing
 import wandb
 from wandb.integration.sb3 import WandbCallback
 from stable_baselines3 import PPO
@@ -197,4 +198,5 @@ def main():
     print(f"[INFO] Training complete. Files saved in {models_dir}")
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method('fork', force=True)
     main()
