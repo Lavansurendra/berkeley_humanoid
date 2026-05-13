@@ -6,11 +6,17 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
-from environment.berkeley_mujoco_env import BerkeleyHumanoidMujocoEnv
+from environment.berkeley_env import BerkeleyEnv
+from environment.g1_env import G1Env
 
+# Dict maintaining a list of environment choices for training, for parsing command-line args
+ENV_LISTS = {
+    "G1Env": G1Env,
+    "BerkeleyEnv": BerkeleyHumanoidMujocoEnv
+}
 
 class HumanoidCheckpointCallback(BaseCallback):
-    def __init__(self, save_freq, save_path, name_prefix="berkeley", verbose=1):
+    def __init__(self, save_freq, save_path, name_prefix="g1", verbose=1):
         super().__init__(verbose)
         self.save_freq = save_freq # TODO: model weights should be saved once every few epochs, not based on a set number of timesteps
         self.save_path = save_path
@@ -52,16 +58,18 @@ def main():
     
     # Environment + infrastructure
     parser.add_argument("--xml_path", type=str, default="environment/berkeley_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
+    parser.add_argument("--env-id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
+    
     parser.add_argument("--num_envs", type=int, default=20, help="Number of environments to run in parallel (set to # of logical cores on your machine)")
-    parser.add_argument("--timesteps_per_env", type=int, default=250000, help="# of timesteps per environment per training cycle")
+    parser.add_argument("--timesteps_per_env", type=int, default=20000, help="# of timesteps per environment per training cycle")
     
     # Hyperparams
     #parser.add_argument("--policy_type", type=str, default="MlpPolicy", help="NN architecture (e.g., MlpPolicy)")
     parser.add_argument("--learning_rate", type=float, default=3e-4, help="Initial learning rate")
     parser.add_argument("--n_steps", type=int, default=2048, help="# of timeSTEPS (NOT TIMES!) per environment per rollout")
-    parser.add_argument("--batch_size", type=int, default=128, help="Minibatch size")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--n_epochs", type=int, default=10, help="# of epochs")
-    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--gamma", type=float, default=0.99, help="???") # TODO: add brief explanation at some point
     
     # Callbacks, wandb logging
     parser.add_argument("--save_freq", type=int, default=100000, help="Checkpoint frequency in total timesteps")
@@ -83,26 +91,22 @@ def main():
 
             '''
         "total_timesteps": total_timesteps, # this is the total number of timesteps per training cycle (NOT THE NUMBER OF TIMESTEPS TOTAL PER ENVIRONMENT)
-            '''
-            this can be verified by noting that this element of the config dictionary is supplied to the model.learn function call
-            which then supplies this number to the super().learn function call (which calls the .learn method of the OnPolicyAlgorithm class which is a parent class to the PPO class)
-            which then checks to make sure the total number of timesteps that have passed so far is less than this number
-            NOTE: this number is NOT the total number of timesteps per environment, instead it is just the total number of timesteps that will occur in a singel training cycle where 
-            every time all the environments are stepped once in a single iteration of the rollout while loop, 1 timestep times the number of environments running in parallel is added to the counter
-            that is checked to be less than this variable to keep training going
-            '''
+            # this can be verified by noting that this element of the config dictionary is supplied to the model.learn function call
+            # which then supplies this number to the super().learn function call (which calls the .learn method of the OnPolicyAlgorithm class which is a parent class to the PPO class)
+            # which then checks to make sure the total number of timesteps that have passed so far is less than this number
+            # NOTE: this number is NOT the total number of timesteps per environment, instead it is just the total number of timesteps that will occur in a singel training cycle where 
+            # every time all the environments are stepped once in a single iteration of the rollout while loop, 1 timestep times the number of environments running in parallel is added to the counter
+            # that is checked to be less than this variable to keep training going
         "learning_rate": args.learning_rate,
         "n_steps": args.n_steps, # this is the number of timesteps (NOT TIMES!) per environment per rollout
-            '''
-            this can be verified by noting that this element of the config dictionary is supplied to the PPO function call
-            which then initializes an instance of the PPO class found in the stable_baselines3/ppo/ppo.py file alongside all the attributes and methods of its parent class (the OnPolicyAlgorithm class found in the stable_baselines3/common/on_policy_algorithm.py file).
-            this means that when the model.learn function is called down below, the .learn method of the PPO class is called which then calls the .learn method of the OnPolicyAlgorithm class
-            which then supplies to the collect_rollouts method of the OnPolicyAlgorithm class self.n_steps (.n_steps is the attribute of the OnPolicyAlgorithm class containing this value)
-            which then has a while loop containing all the function calls needed to make everything that happens in each timestep of a rollout happen
-            where one of the things that happens in each iteration is every environment is stepped once and the n_steps variable (from the collect_rollouts function not here) is incremented by 1
-            such that every iteration the condition being checked by the while loop is if n_steps is less than n_rollout_steps which now contains the value stored in this variable 
-            NOTE: the total number of timesteps per rollout can be found by multiplying this number by the number of environments
-            '''
+            # this can be verified by noting that this element of the config dictionary is supplied to the PPO function call
+            # which then initializes an instance of the PPO class found in the stable_baselines3/ppo/ppo.py file alongside all the attributes and methods of its parent class (the OnPolicyAlgorithm class found in the stable_baselines3/common/on_policy_algorithm.py file).
+            # this means that when the model.learn function is called down below, the .learn method of the PPO class is called which then calls the .learn method of the OnPolicyAlgorithm class
+            # which then supplies to the collect_rollouts method of the OnPolicyAlgorithm class self.n_steps (.n_steps is the attribute of the OnPolicyAlgorithm class containing this value)
+            # which then has a while loop containing all the function calls needed to make everything that happens in each timestep of a rollout happen
+            # where one of the things that happens in each iteration is every environment is stepped once and the n_steps variable (from the collect_rollouts function not here) is incremented by 1
+            # such that every iteration the condition being checked by the while loop is if n_steps is less than n_rollout_steps which now contains the value stored in this variable 
+            # NOTE: the total number of timesteps per rollout can be found by multiplying this number by the number of environments
         "batch_size": args.batch_size,
         "n_epochs": args.n_epochs,
         "gamma": args.gamma,
@@ -121,7 +125,7 @@ def main():
 
     print(f"[INFO] Creating {args.num_envs} Parallel MuJoCo Environments...")
     env = make_vec_env(
-        env_id=BerkeleyHumanoidMujocoEnv, 
+        env_id=ENV_LISTS[args.env_id], 
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv
@@ -162,7 +166,7 @@ def main():
     checkpoint_callback = HumanoidCheckpointCallback(
         save_freq=args.save_freq, 
         save_path=checkpoints_dir,
-        name_prefix='berkeley_humanoid'
+        name_prefix='g1'
     )
 
     # W&B callback for system metrics (psutil) and gradient tracking
@@ -181,8 +185,8 @@ def main():
     )
 
     print("[INFO] Saving final model...")
-    final_model_path = os.path.join(models_dir, f"berkeley_humanoid_final_{total_timesteps}")
-    stats_path = os.path.join(models_dir, f"berkeley_humanoid_vecnormalize_{total_timesteps}.pkl")
+    final_model_path = os.path.join(models_dir, f"g1_final_{total_timesteps}")
+    stats_path = os.path.join(models_dir, f"g1_vecnormalize_{total_timesteps}.pkl")
 
     model.save(final_model_path)
     env.save(stats_path)

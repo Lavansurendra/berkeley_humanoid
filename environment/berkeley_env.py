@@ -3,7 +3,7 @@ from gymnasium import spaces
 import mujoco
 import numpy as np
 
-class BerkeleyHumanoidMujocoEnv(gym.Env):
+class BerkeleyEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
     def __init__(self, xml_path, render_mode=None):
@@ -86,7 +86,7 @@ class BerkeleyHumanoidMujocoEnv(gym.Env):
         if self.np_random.uniform() < 0.005:
             # Curriculum scale: Starts at 30N, maxes out at 100N at 1,000,000 steps
             progress = min(1.0, self.total_steps / 1_000_000.0)
-            current_max_force = 30.0 + (70.0 * progress) 
+            current_max_force = 5.0 + (20.0 * progress) 
             
             force_x = self.np_random.uniform(-current_max_force, current_max_force)
             force_y = self.np_random.uniform(-current_max_force, current_max_force)
