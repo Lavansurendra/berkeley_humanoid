@@ -1,5 +1,5 @@
 universe = container
-container_image = docker://lavansurendra/wiscohumanoids:v1
+container_image = docker://lavansurendra/wiscohumanoids:v2
 
 log = $(Cluster).$(Process).log
 error = $(Cluster).$(Process).err
