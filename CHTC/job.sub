@@ -1,19 +1,18 @@
 universe = container
 container_image = docker://lavansurendra/wiscohumanoids:v2
 
-log = $(Cluster).$(Process).log
-error = $(Cluster).$(Process).err
-output = $(Cluster).$(Process).out
+log = CHTC_logs/$(Cluster).$(Process).log
+error = CHTC_errors/$(Cluster).$(Process).err
+output = CHTC_output/$(Cluster).$(Process).out
 
-# Requesting 10 CPUs to handle the 10 parallel MuJoCo environments
-request_cpus = 10
-request_memory = 32GB
+# Requesting 10 CPUs to handle the 4 parallel MuJoCo environments
+request_cpus = 16
+request_memory = 16GB
 request_disk = 60GB
 
 executable = train.sh
-arguments = --env-id G1Env --num_envs 20 --timesteps_per_env 50000 --xml_path environment/g1_scene.xml
+arguments = --env-id G1Env --num_envs 16 --timesteps_per_env 10000 --xml_path /workspace/environment/g1_scene.xml --save_freq 10000
 
-transfer_input_files = environment/, train.py
 
 # Retrieve training output and local W&B data upon exit
 should_transfer_files = YES

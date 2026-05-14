@@ -189,12 +189,16 @@ class G1Env(gym.Env):
             
             # calculate reward terms
             r_alive = alive_reward()
+            
+            # calculate penatly terms
+            p_velocity = velocity_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 0.1
+            w_velocity = 0.9
 
             # add to reward
-            total_reward += w_alive*r_alive
+            total_reward += w_alive*r_alive + w_velocity*p_velocity
 
             # for the unitree we do not need to reset the force on each joint as we write directly to mj.ctrl which overwrites the forces each step
             # with the berkeley humanoid we used qfrc_applied to apply torques instead of writing to mj.ctrl so we had to reset those forces each step like we do with the external forces above
@@ -294,6 +298,11 @@ class G1Env(gym.Env):
         
         return np.concatenate([qpos, qvel]).astype(np.float32)
     
+def velocity_reward(x_vel, target_velocity=1.0):
+    forward_velocity = x_vel
+    velocity_error = abs(forward_velocity - target_velocity)
+    return -velocity_error
+
 def feet_slide_reward(model, data, foot_body_ids, action):
 
     sliding_penalty = 0.0
