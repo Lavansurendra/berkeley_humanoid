@@ -1,9 +1,12 @@
 import os
 import time
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from environment.berkeley_env import BerkeleyEnv
 from environment.g1_env import G1Env
+
+
 
 def main():
     # 1. Update the XML path to the new assets folder
@@ -11,10 +14,10 @@ def main():
     
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "g1_final_160000"
+    model_name = "g1_final_300000"
     
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "g1_vecnormalize_160000.pkl")
+    stats_path = os.path.join(models_dir, "g1_vecnormalize_300000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
