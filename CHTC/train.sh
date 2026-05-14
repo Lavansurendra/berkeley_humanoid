@@ -1,5 +1,12 @@
 #!/bin/bash
 
+echo "=================================================="
+echo "CHTC START TIME: $(date)"
+echo -n "IMAGE BUILD DATE: "
+# This file is created in your Dockerfile during the 'v3' build
+cat /image_build_date.txt || echo "ERROR: Build date file not found."
+echo "=================================================="
+
 # Define the path to the code inside your Docker image
 CODE_DIR="/workspace"
 
