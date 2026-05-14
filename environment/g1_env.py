@@ -3,7 +3,6 @@ from gymnasium import spaces
 import mujoco
 import numpy as np
 
-import rewards as rw
 
 class G1Env(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
@@ -154,11 +153,11 @@ class G1Env(gym.Env):
         for _ in range(num_timesteps):
             
             # calculate reward terms
-            r_alive = rw.alive_reward()
-            r_forward = rw.forward_motion_reward(self.data.qvel[0])
+            r_alive = alive_reward()
+            r_forward = forward_motion_reward(self.data.qvel[0])
             
             # calculate penatly terms
-            px_velocity = rw.velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
+            px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 0.1
@@ -252,3 +251,43 @@ class G1Env(gym.Env):
         
         return np.concatenate([qpos, qvel]).astype(np.float32)
     
+
+# ======================================================= Rewards =========================================================
+
+def alive_reward():
+    return 1.0
+
+def forward_motion_reward(forward_velocity):
+
+    return forward_velocity
+
+
+def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
+
+    velocity_error = abs(forward_velocity - target_velocity)
+    return -velocity_error
+
+def feet_slide_reward(model, data, foot_body_ids, action):
+
+    sliding_penalty = 0.0
+    
+    for foot_id in foot_body_ids:
+        # Check if foot is in contact with the floor
+        # MuJoCo handles contacts differently; we iterate through the contact array
+        in_contact = False
+        for i in range(data.ncon):
+            contact = data.contact[i]
+            if contact.geom1 == foot_id or contact.geom2 == foot_id:
+                in_contact = True
+                break
+                
+        if in_contact:
+            # Get linear velocity of the foot
+            # data.cvel gives 6D spatial velocity (3 rot, 3 lin) for each body
+            foot_vel = data.cvel[foot_id][3:5] # X and Y velocity
+            vel_norm = np.linalg.norm(foot_vel)
+            
+            # Penalize the magnitude of velocity while in contact
+            sliding_penalty += vel_norm
+            
+    return -sliding_penalty # Negative because it's a penalty
