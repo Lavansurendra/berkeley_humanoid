@@ -1,3 +1,6 @@
+import typing
+from typing import NamedTuple, Any
+
 import multiprocessing
 import os
 
@@ -137,7 +140,7 @@ def main():
         env_id=ENV_LISTS[args.env_id], 
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
-        vec_env_cls=SubprocVecEnv
+        vec_env_cls=SubprocVecEnv,
         vec_env_kwargs={'start_method': 'fork'}
     )
 
