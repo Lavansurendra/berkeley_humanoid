@@ -1,14 +1,7 @@
 import typing
 from typing import NamedTuple, Any
 import numpy
-import multiprocessing
 import os
-
-# try:
-#     multiprocessing.set_start_method('fork', force=True)
-# except RuntimeError:
-#     pass
-
 import argparse
 import multiprocessing
 import wandb
@@ -141,7 +134,6 @@ def main():
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv,
-        # vec_env_kwargs={'start_method': 'fork'}
     )
 
     env = VecNormalize(
