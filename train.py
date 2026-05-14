@@ -1,11 +1,10 @@
 import multiprocessing
 import os
 
-if __name__ == "__main__":
-    try:
-        multiprocessing.set_start_method('fork', force=True)
-    except RuntimeError:
-        pass
+try:
+    multiprocessing.set_start_method('fork', force=True)
+except RuntimeError:
+    pass
 
 import argparse
 import multiprocessing
@@ -139,6 +138,7 @@ def main():
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv
+        vec_env_kwargs={'start_method': 'fork'}
     )
 
     env = VecNormalize(
