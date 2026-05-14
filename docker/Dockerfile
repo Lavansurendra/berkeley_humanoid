@@ -34,6 +34,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
+RUN date > /image_build_date.txt
+
 # Remove cv2/typing directory that shadows stdlib typing in spawn workers
 RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2/typing
 
