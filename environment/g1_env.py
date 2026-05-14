@@ -72,6 +72,15 @@ class G1Env(gym.Env):
         self.num_actions = 29 
         self.num_obs = 68
 
+        # initialize an array to hold the lower and upper limits of the range of motion of each joint (excluding the freejoint) in radians relative to the joint reference points (right now set to 0 rad)
+        self.joint_lims = np.array(
+            [[-2.5307, 2.8798], [-0.5236, 2.9671], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-2.5307, 2.8798], [-2.9671, 0.5236], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-2.618, 2.618], [-0.52, 0.52], [-0.52, 0.52], [-3.0892, 2.6704], [-1.5882, 2.2515], [-2.618, 2.618], [-1.0472, 2.0944],
+            [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443], [-3.0892, 2.6704], [-2.2515, 1.5882], [-2.618, 2.61],
+            [-1.0472, 2.0944], [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443]])
+
+
         # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
         key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
 
@@ -88,7 +97,9 @@ class G1Env(gym.Env):
         # This variable will track the total number of steps taken across all episodes, which we can use to scale the difficulty of the random pushes over time (curriculum learning)
         self.total_steps = 0
 
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(self.num_actions,), dtype=np.float32)
+        # NOTE: we are changing the upper and lower limits of the action space to be greater than the largest and smaller than the smallest joint limitation
+            # this will ensure that the learning policy can output any value as the mean and so explore the effects of many different actions
+        self.action_space = spaces.Box(low=-5.0, high=5.0, shape=(self.num_actions,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_obs,), dtype=np.float32)
 
         self.render_mode = render_mode
@@ -132,21 +143,20 @@ class G1Env(gym.Env):
             self.data.xfrc_applied[self.pelvis_id, 0] = force_x
             self.data.xfrc_applied[self.pelvis_id, 1] = force_y
 
-        # --- ACTION APPLICATION ---
-        # Scale AI output to +/- 0.3 radians around the crouch
-        target_q = action * 0.3 + self.nominal_qpos
+        # # --- ACTION APPLICATION ---
+        # # Scale AI output to +/- 0.3 radians around the crouch
+        # target_q = action * 0.3 + self.nominal_qpos
+
+        # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
+            # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
+            # that the robot cannot execute but those actions outside the joint limits should not actually be tried to be executed to prevent possible calculation explosion exploits
+        clipped_action = np.clip(action, self.joint_lims[:,0], self.joint_lims[:,1])
         
         # initialize reward value
         total_reward = 0.0
 
         # set number of timesteps per action
         num_timesteps = 25
-
-        # # define the timestep duration (dt) in seconds based on the timestep length defined in the scene.xml file and the number of timesteps we want to run for each action
-        # dt = self.model.opt.timestep * num_timesteps
-
-        # # set the maximum allowed change in angle per timestep based on velocity limits and timestep duration (dt)
-        # max_delta_q = self.velocity_limits * dt
 
         # --- PHYSICS LOOP ---
         # NOTE: the number set here in this loop in combination with the timestep length set in the scene.xml file determines the control frequency of the robot
@@ -159,17 +169,20 @@ class G1Env(gym.Env):
             r_forward = forward_motion_reward(self.data.qvel[0])
             
             # calculate penatly terms
-            px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
+            p_limits = motor_limit_penalty(action, self.joint_lims)
+            # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 0.1
             w_velocity = 0.9
+            w_limits = 1
 
             # add to reward
-            total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward           
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits         
+            # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
-            self.data.ctrl[:] = target_q
+            self.data.ctrl[:] = clipped_action
 
             # 6. Step physics
             mujoco.mj_step(self.model, self.data)
@@ -181,9 +194,7 @@ class G1Env(gym.Env):
             self.viewer.sync()
 
         obs = self._get_obs()
-        
-        # # Base Reward
-        # reward = 1.0
+    
         
         # record the z height of the pelvis
             # NOTE: the pelvis is the freejoint of the unitree robot and it's z height is saved at index 2 of the qpos vector 
@@ -255,6 +266,24 @@ class G1Env(gym.Env):
     
 
 # ======================================================= Rewards =========================================================
+
+def motor_limit_penalty(action, joint_lims):
+
+    '''
+    Penalize the agent if the action is outside the joint limitations
+    The reason we are adding this reward is because we want the learning policy to have no limitations on the action values it can output
+    so that it can explore the full range of possible actions and find the best ones that maximize the reward however we also
+    need it to learn that it should only output values that are actually possible for the robot to execute hence the penalty
+    '''
+    
+    # calculate the distance between the angular positions specified in the action vector and the lower and upper limits of the joint rangees of motion
+    lower_lim_dist = np.abs(np.minimum(action - joint_lims[:,0], np.zeros_like(action)))
+    upper_lim_dist = np.maximum(action - joint_lims[:,1], np.zeros_like(action))
+
+    # calculate an offset term so that as the actions get closer to being inside the limits the penalty does not go to 0 and there is a still a penalty for being outside the limits
+    offset = np.astype(((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])), int)
+
+    return -(np.sum(lower_lim_dist) + np.sum(upper_lim_dist)) - np.sum(offset)
 
 def alive_reward():
     return 1.0
