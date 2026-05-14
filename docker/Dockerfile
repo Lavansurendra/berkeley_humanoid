@@ -34,8 +34,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Preload stdlib typing to prevent cv2/typing shadowing in multiprocessing spawn flows
-RUN printf 'import typing\n' > /usr/local/lib/python${PYTHON_VERSION}/dist-packages/sitecustomize.py
+# Remove cv2/typing directory that shadows stdlib typing in spawn workers
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2/typing
 
 # this is a dummy argument that we can use to force the cache to bust and the image to be rebuilt when we want to update the code in the repo, since the code is cloned in the same layer as this argument, any change to this argument will cause the code to be re-cloned and thus updated in the image
 ARG CACHEBUST=1

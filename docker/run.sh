@@ -7,8 +7,8 @@ set -e  # Exit on error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Configuration
-IMAGE_NAME="locomotion"
-IMAGE_TAG="latest"
+IMAGE_NAME="lavansurendra/wiscohumanoids"
+IMAGE_TAG="v2"
 FULL_IMAGE_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 CONTAINER_NAME="locomotion-dev"
 
