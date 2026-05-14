@@ -3,6 +3,8 @@ from gymnasium import spaces
 import mujoco
 import numpy as np
 
+import rewards as rw
+
 class G1Env(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
@@ -70,42 +72,6 @@ class G1Env(gym.Env):
         
         self.num_actions = 29 
         self.num_obs = 68
-        
-        # kp and kd setting now done in xml file
-        # torque limits now done in xml file using the actuatorfrcrange attribute for each joint which only works when actuator elements corresponding to those joints are created
-
-        # # NOTE: these values were taken from the unitree_ros github and will be used in combination with a dt variable to set velocity limits on the motors if neccessary
-        # self.velocity_limits = np.array([
-        #     32.0,  # left_hip_pitch
-        #     20.0,  # left_hip_roll
-        #     32.0,  # left_hip_yaw
-        #     20.0,  # left_knee
-        #     30.0,  # left_ankle_pitch
-        #     30.0,  # left_ankle_roll
-        #     32.0,  # right_hip_pitch
-        #     20.0,  # right_hip_roll
-        #     32.0,  # right_hip_yaw
-        #     20.0,  # right_knee
-        #     30.0,  # right_ankle_pitch
-        #     30.0,  # right_ankle_roll
-        #     32.0,  # waist_yaw
-        #     30.0,  # waist_roll
-        #     30.0,  # waist_pitch
-        #     37.0,  # left_shoulder_pitch
-        #     37.0,  # left_shoulder_roll
-        #     37.0,  # left_shoulder_yaw
-        #     37.0,  # left_elbow
-        #     37.0,  # left_wrist_roll
-        #     22.0,  # left_wrist_pitch
-        #     22.0,  # left_wrist_yaw
-        #     37.0,  # right_shoulder_pitch
-        #     37.0,  # right_shoulder_roll
-        #     37.0,  # right_shoulder_yaw
-        #     37.0,  # right_elbow
-        #     37.0,  # right_wrist_roll
-        #     22.0,  # right_wrist_pitch
-        #     22.0,  # right_wrist_yaw
-        # ], dtype=np.float32)
 
         # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
         key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
@@ -188,30 +154,18 @@ class G1Env(gym.Env):
         for _ in range(num_timesteps):
             
             # calculate reward terms
-            r_alive = alive_reward()
+            r_alive = rw.alive_reward()
+            r_forward = rw.forward_motion_reward(self.data.qvel[0])
             
             # calculate penatly terms
-            p_velocity = velocity_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
+            px_velocity = rw.velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 0.1
             w_velocity = 0.9
 
             # add to reward
-            total_reward += w_alive*r_alive + w_velocity*p_velocity
-
-            # for the unitree we do not need to reset the force on each joint as we write directly to mj.ctrl which overwrites the forces each step
-            # with the berkeley humanoid we used qfrc_applied to apply torques instead of writing to mj.ctrl so we had to reset those forces each step like we do with the external forces above
-            
-            # get current angular position information for the PD controllers
-            current_q = self.data.qpos[7:36]
-            
-            # for the unitree we dont need to do PD math as it is done internally in the mujoco xml file using the kp and kd attributes of the actuators
-            # but for the berkeley humanoid we had to do the PD math ourselves and apply the resulting torques using qfrc_applied as we didn't use actuator elements            
-            
-            # # set a limit on the target angular position so that each motor remains within its velocity limits
-            # clamped_ctrl = np.clip(target_q, current_q - max_delta_q, current_q + max_delta_q)
-
+            total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward           
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = target_q
@@ -298,35 +252,3 @@ class G1Env(gym.Env):
         
         return np.concatenate([qpos, qvel]).astype(np.float32)
     
-def velocity_reward(x_vel, target_velocity=1.0):
-    forward_velocity = x_vel
-    velocity_error = abs(forward_velocity - target_velocity)
-    return -velocity_error
-
-def feet_slide_reward(model, data, foot_body_ids, action):
-
-    sliding_penalty = 0.0
-    
-    for foot_id in foot_body_ids:
-        # Check if foot is in contact with the floor
-        # MuJoCo handles contacts differently; we iterate through the contact array
-        in_contact = False
-        for i in range(data.ncon):
-            contact = data.contact[i]
-            if contact.geom1 == foot_id or contact.geom2 == foot_id:
-                in_contact = True
-                break
-                
-        if in_contact:
-            # Get linear velocity of the foot
-            # data.cvel gives 6D spatial velocity (3 rot, 3 lin) for each body
-            foot_vel = data.cvel[foot_id][3:5] # X and Y velocity
-            vel_norm = np.linalg.norm(foot_vel)
-            
-            # Penalize the magnitude of velocity while in contact
-            sliding_penalty += vel_norm
-            
-    return -sliding_penalty # Negative because it's a penalty
-
-def alive_reward():
-    return 1.0
