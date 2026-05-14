@@ -1,5 +1,4 @@
 import typing
-from typing import NamedTuple, Any
 import numpy
 import os
 import argparse
