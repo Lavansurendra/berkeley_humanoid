@@ -110,7 +110,7 @@
                   <geom class="foot" pos="-0.05 -0.025 -0.03"/>
                   <geom class="foot" pos="0.12 0.03 -0.03"/>
                   <geom class="foot" pos="0.12 -0.03 -0.03"/>
-                  <site name="left_foot"/>
+                  <site name="left_foot" type = "box" pos="0.035 0 -0.03" size="0.09 0.04 0.01" rgba="0 1 0 0.3"/>
                 </body>
               </body>
             </body>
@@ -156,7 +156,7 @@
                   <geom class="foot" pos="-0.05 -0.025 -0.03"/>
                   <geom class="foot" pos="0.12 0.03 -0.03"/>
                   <geom class="foot" pos="0.12 -0.03 -0.03"/>
-                  <site name="right_foot"/>
+                  <site name="right_foot" type = "box" pos="0.035 0 -0.03" size="0.09 0.04 0.01" rgba="0 1 0 0.3"/>
                 </body>
               </body>
             </body>
@@ -341,6 +341,14 @@
     <accelerometer site="imu_in_torso" name="imu-torso-linear-acceleration" cutoff="157" noise="0.01"/>
     <gyro site="imu_in_pelvis" name="imu-pelvis-angular-velocity" cutoff="34.9" noise="0.0005"/>
     <accelerometer site="imu_in_pelvis" name="imu-pelvis-linear-acceleration" cutoff="157" noise="0.01"/>
+
+    <!-- Distance sensors (indices: 12, 13) (values: ~0 when both feet are on the ground)  (target estimate visual: 0.07)-->
+    <distance name="left_foot_to_ground" body1="left_ankle_roll_link" geom2="floor"  cutoff = "10"/>
+    <distance name="right_foot_to_ground" body1="right_ankle_roll_link" geom2="floor" cutoff = "10"/>
+
+    <!-- Touch sensors (indices: 14, 15) (values: ~160 on both feet, ~30 fallen over backwards, ~20 fallen over forwards) -->
+    <touch name="left_foot_touch" site="left_foot"/>
+    <touch name="right_foot_touch" site="right_foot"/>
   </sensor>
 
   <keyframe>

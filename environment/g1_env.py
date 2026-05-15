@@ -164,10 +164,29 @@ class G1Env(gym.Env):
             # control frequency = 1 / (length of timestep * number of timesteps per action)
             # NOTE: the higher the control frequency, the more poses the robot can exist in that are maybe not optimal but feasible for it to maintain because it can issue commands so fast
         for _ in range(num_timesteps):
+
             
+            # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
+                # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
+                # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
+            left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
+            right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
+            
+            # contact force from touch sensors on the feet
+                # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
+            left_foot_force = self.data.sensor("left_foot_touch").data[0]
+            right_foot_force = self.data.sensor("right_foot_touch").data[0]
+
             # calculate reward terms
             r_alive = alive_reward()
             r_forward = forward_motion_reward(self.data.qvel[0])
+            # # calculate foot lift reward proportional to height of foot above floor
+            # r_foot_lift = foot_lift_reward(left_foot_height, right_foot_height)
+            # # calculate foot target penalty for keeping feet on the ground or lifting them too high
+            # r_foot_target = foot_target_penalty(left_foot_height, right_foot_height)
+            # # calculate a reward depending on if the feet sites are contacting the ground at all
+            # r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
+            
             
             # calculate penatly terms
             p_limits = motor_limit_penalty(action, self.joint_lims)
@@ -177,10 +196,14 @@ class G1Env(gym.Env):
             w_alive = 0.1
             w_velocity = 0.9
             w_limits = 1
+            # w_foot_lift = 0.5
+            # w_foot_target = 0.5
+            # w_foot_contact = 0.5
 
             # add to reward
             # total_reward += w_velocity*r_forward + w_limits*p_limits         
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits         
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits       
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_foot_lift*r_foot_lift + w_foot_target*r_foot_target + w_foot_contact*r_foot_contact      
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
@@ -300,6 +323,40 @@ def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
     velocity_error = abs(forward_velocity - target_velocity)
     return -velocity_error
 
+def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=10.0):
+    
+    # check if both feet off of ground
+    left_foot_force_below_threshold = left_foot_force < contact_threshold
+    right_foot_force_below_threshold = right_foot_force < contact_threshold
+    both_feet_off_ground = (left_foot_force_below_threshold * right_foot_force_below_threshold)
+    
+    # reward for lifting feet off the ground (0 if both feet not supporting weight on ground)
+    left_foot_reward = left_foot_height *(1-both_feet_off_ground)
+    right_foot_reward = right_foot_height *(1-both_feet_off_ground)
+
+    return left_foot_reward + right_foot_reward
+
+def foot_target_penalty(left_foot_height, right_foot_height, target_height=0.07, left_foot_force=0.0, right_foot_force=0.0, contact_threshold=10.0):
+
+    # check if either foot is off the ground
+        # NOTE: we assume a foot is off the ground if it's contact force is above a threshold
+    left_foot_force_below_threshold = left_foot_force < contact_threshold
+    right_foot_force_below_threshold = right_foot_force < contact_threshold
+
+    # penalty for distance from feet target height
+    left_foot_reward = -abs(left_foot_height - target_height) * left_foot_force_below_threshold
+    right_foot_reward = -abs(right_foot_height - target_height) * right_foot_force_below_threshold
+
+    return left_foot_reward + right_foot_reward
+
+def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=10.0):
+
+    # reward for having at least one foot not in contact with the ground but not both feet off the ground
+        # NOTE: we assume a foot is off the ground if it's contact force is below a threshold
+    foot_contact_reward = ((left_foot_force<contact_threshold) + (right_foot_force<contact_threshold))%2
+
+    return foot_contact_reward
+
 def feet_slide_reward(model, data, foot_body_ids, action):
 
     sliding_penalty = 0.0
@@ -323,4 +380,4 @@ def feet_slide_reward(model, data, foot_body_ids, action):
             # Penalize the magnitude of velocity while in contact
             sliding_penalty += vel_norm
             
-    return -sliding_penalty # Negative because it's a penalty
+    return -sliding_penalty # Negative because it's a penalt
