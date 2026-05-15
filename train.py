@@ -63,11 +63,11 @@ def main():
     parser.add_argument("--seed", type=int, default=1, help="Random seed for reproducibility")
 
     # Environment + infrastructure
-    parser.add_argument("--xml_path", type=str, default="environment/berkeley_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
-    parser.add_argument("--env_id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
+    parser.add_argument("--xml_path", type=str, default="environment/g1_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
+    parser.add_argument("--env_id", type=str, default="G1Env", choices=list(ENV_LISTS.keys()), help="Target environment class")
     
     parser.add_argument("--num_envs", type=int, default=20, help="Number of environments to run in parallel (set to # of logical cores on your machine)")
-    parser.add_argument("--timesteps_per_env", type=int, default=20000, help="# of timesteps per environment per training cycle")
+    parser.add_argument("--timesteps_per_env", type=int, default=10000, help="# of timesteps per environment per training cycle")
     
     # Hyperparams
     #parser.add_argument("--policy_type", type=str, default="MlpPolicy", help="NN architecture (e.g., MlpPolicy)")
