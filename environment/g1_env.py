@@ -166,7 +166,7 @@ class G1Env(gym.Env):
         for _ in range(num_timesteps):
             
             # calculate reward terms
-            # r_alive = alive_reward()
+            r_alive = alive_reward()
             r_forward = forward_motion_reward(self.data.qvel[0])
             
             # calculate penatly terms
@@ -174,13 +174,13 @@ class G1Env(gym.Env):
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
-            # w_alive = 0.1
+            w_alive = 0.1
             w_velocity = 0.9
             w_limits = 1
 
             # add to reward
-            total_reward += w_velocity*r_forward + w_limits*p_limits         
-            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits         
+            # total_reward += w_velocity*r_forward + w_limits*p_limits         
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits         
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
