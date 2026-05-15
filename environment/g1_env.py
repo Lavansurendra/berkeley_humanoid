@@ -139,7 +139,7 @@ class G1Env(gym.Env):
         # 0.5% chance to push per action (~once every 200 actions / 10 seconds)
         if self.np_random.uniform() < 0.005:
             # Curriculum scale: Starts at 10N, maxes out at 50N at 1,000,000 steps
-            progress = min(1.0, self.total_steps / 1_000_000.0)
+            progress = min(1.0, self.total_steps / 1_000_000.0) # TODO: dividing by 1 million here is wrong, we usually only do 10000 timesteps per environment
             current_max_force = 10.0 + (40.0 * progress) 
             
             force_x = self.np_random.uniform(-current_max_force, current_max_force)
@@ -151,21 +151,26 @@ class G1Env(gym.Env):
 
         
         # ------------ Cyclical Thigh Pushing Logic -----------------
+        # set the cutoff timestep
+            # TODO: change this from being hardcoded to being a parameter
+        cutoff_timestep = 5000
+        
         # clear the force applied on each thigh and the pelvis from the previous step
         self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
         self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
         self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
 
         # apply a constant force on the pelvis that cuts off part way through the training
-        self.data.xfrc_applied[self.pelvis_id, 0] = 10
+        self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
 
         # calculate the force that should be applied at the current time on each thigh
-        left_thigh_qfrc = 40 * min(0, np.sin((2*np.pi) * (self.total_steps/40)))
-        right_thigh_qfrc = 40 * min(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
+            # NOTE: positive forces make the legs go backwards
+        left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
+        right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
 
         # set the force being applied for the current time on each thigh
-        self.data.qfrc_applied[6] = left_thigh_qfrc # left hip pitch joint
-        self.data.qfrc_applied[12] = right_thigh_qfrc # right hip pitch joint
+        self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
+        self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
 
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
