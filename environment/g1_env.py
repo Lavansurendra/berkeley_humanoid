@@ -191,16 +191,16 @@ class G1Env(gym.Env):
         for _ in range(num_timesteps):
 
             
-            # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
-                # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
-                # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
-            left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
-            right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
+            # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
+            #     # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
+            #     # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
+            # left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
+            # right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
             
-            # contact force from touch sensors on the feet
-                # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
-            left_foot_force = self.data.sensor("left_foot_touch").data[0]
-            right_foot_force = self.data.sensor("right_foot_touch").data[0]
+            # # contact force from touch sensors on the feet
+            #     # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
+            # left_foot_force = self.data.sensor("left_foot_touch").data[0]
+            # right_foot_force = self.data.sensor("right_foot_touch").data[0]
 
             # calculate reward terms
             r_alive = alive_reward()
@@ -219,7 +219,7 @@ class G1Env(gym.Env):
 
             # reward term weights
             w_alive = 0.1
-            w_velocity = 0.9
+            w_velocity = 1
             w_limits = 1
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
