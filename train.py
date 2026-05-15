@@ -64,7 +64,7 @@ def main():
 
     # Environment + infrastructure
     parser.add_argument("--xml_path", type=str, default="environment/berkeley_scene.xml", help="Path to MuJoCo scene XML (defines the world used in each environment)")
-    parser.add_argument("--env-id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
+    parser.add_argument("--env_id", type=str, default="BerkeleyEnv", choices=list(ENV_LISTS.keys()), help="Target environment class")
     
     parser.add_argument("--num_envs", type=int, default=20, help="Number of environments to run in parallel (set to # of logical cores on your machine)")
     parser.add_argument("--timesteps_per_env", type=int, default=20000, help="# of timesteps per environment per training cycle")

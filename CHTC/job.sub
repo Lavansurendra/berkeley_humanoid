@@ -12,7 +12,7 @@ request_memory = 32GB
 request_disk = 20GB
 
 executable = train.sh
-arguments = --env-id G1Env --num_envs 30 --timesteps_per_env 10000 --xml_path /workspace/environment/g1_scene.xml --save_freq 100000
+arguments = --env_id G1Env --num_envs 30 --timesteps_per_env 10000 --xml_path /workspace/environment/g1_scene.xml --save_freq 100000
 
 
 # Retrieve training output and local W&B data upon exit
