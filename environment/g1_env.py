@@ -66,6 +66,11 @@ class G1Env(gym.Env):
         
         super().__init__()
         
+        # initialize variables to hold python struct objects containing all the static and dynamic information about the current state of the environment
+            # NOTE: the following is my current guess but I don't understand this
+            # a python struct object is an object composed of a set of numpy arrays where each numpy array corresponds to one member of a C struct
+            # mujoco.MjModel creates an instance of the mjModel class (which is a python struct object set up to hold all the data about the current state of the environment)
+            # the .from_xml_path() method then populates the new python struct object with all the data from the scene files
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
         
@@ -83,12 +88,11 @@ class G1Env(gym.Env):
 
         # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
         key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-
-        print(key_id)
         
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
-        self.nominal_qpos = self.model.key_qpos[key_id][7:]
+        self.nominal_qpos = self.model.key_qpos[key_id]
+        # self.nominal_qpos = self.model.key_qpos[key_id][7:]
 
         
         # retrieving the ID for the pelvis body (used for applying random pushes in the step function)
@@ -143,9 +147,6 @@ class G1Env(gym.Env):
             self.data.xfrc_applied[self.pelvis_id, 0] = force_x
             self.data.xfrc_applied[self.pelvis_id, 1] = force_y
 
-        # # --- ACTION APPLICATION ---
-        # # Scale AI output to +/- 0.3 radians around the crouch
-        # target_q = action * 0.3 + self.nominal_qpos
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
             # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
@@ -217,12 +218,14 @@ class G1Env(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         
         # specifically resetting to the crouching keyframe
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-        self.data.qpos[:] = self.model.key_qpos[key_id]
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
+        # self.data.qpos[:] = self.model.key_qpos[key_id]
+        self.data.qpos[:] = self.nominal_qpos
 
         # when we reset to the crouching keyframe we must also reset the control array to match the crouching pose
         # so that the PD controllers in the xml file dont apply huge forces trying to get the robot to the target pose defined by the control array which would cause it to explode on reset
-        self.data.ctrl[:] = self.model.key_qpos[key_id][7:]
+        # NOTE: here because the control values necessarily must be the same as the nominal position values, we can reset the control values using teh nominal position values
+        self.data.ctrl[:] = self.nominal_qpos[7:]
 
         # adding a little noise to each of the joints
         # (We skip 0:7 to avoid the torso's x,y,z and quaternion)
@@ -235,9 +238,7 @@ class G1Env(gym.Env):
         # reset the step count for the episode so that curriculum learning can start again with the smallest random pushes
         self.step_count = 0
         
-        # now using mj_forward (which is a command that calculates positions and velocities based on the current state of the robot
-        # we can update the qpos and qvel vectors to reflect the changes we made to the robot's state in the reset function (like setting it to the crouching keyframe and adding noise) before we start stepping the physics forward in time.
-            # NOTE: unlike with mj_step, mj_forward does not run the numerical solver and cause the robot to move it simply updates the position and velocity information based on the current state of the robot.
+        # based on the new set position and velocity values, calculate and populate all of the other values stored in mjModel and mjData
         mujoco.mj_forward(self.model, self.data)
 
         # we then allow the physics engine to step forward a few times to let the robot settle into the new pose after reset before we start returning observations and rewards to the agent. 
