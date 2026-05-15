@@ -86,10 +86,10 @@ class G1Env(gym.Env):
             [-1.0472, 2.0944], [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443]])
 
 
-        # # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
-        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-        # in the xml for the keyframe named "step" the robot is in the initial step position
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
+        # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
+        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
+        # # in the xml for the keyframe named "step" the robot is in the initial step position
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
         
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
@@ -151,26 +151,26 @@ class G1Env(gym.Env):
 
         
         # ------------ Cyclical Thigh Pushing Logic -----------------
-        # set the cutoff timestep
-            # TODO: change this from being hardcoded to being a parameter
-        cutoff_timestep = 5000
+        # # set the cutoff timestep
+        #     # TODO: change this from being hardcoded to being a parameter
+        # cutoff_timestep = 5000
         
-        # clear the force applied on each thigh and the pelvis from the previous step
-        self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
-        self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
-        self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+        # # clear the force applied on each thigh and the pelvis from the previous step
+        # self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
+        # self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
+        # self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
 
-        # apply a constant force on the pelvis that cuts off part way through the training
-        self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
+        # # apply a constant force on the pelvis that cuts off part way through the training
+        # self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
 
-        # calculate the force that should be applied at the current time on each thigh
-            # NOTE: positive forces make the legs go backwards
-        left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
-        right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
+        # # calculate the force that should be applied at the current time on each thigh
+        #     # NOTE: positive forces make the legs go backwards
+        # left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
+        # right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
 
-        # set the force being applied for the current time on each thigh
-        self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
-        self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
+        # # set the force being applied for the current time on each thigh
+        # self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
+        # self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
 
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
