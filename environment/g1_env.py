@@ -331,7 +331,8 @@ def motor_limit_penalty(action, joint_lims):
     upper_lim_dist = np.maximum(action - joint_lims[:,1], np.zeros_like(action))
 
     # calculate an offset term so that as the actions get closer to being inside the limits the penalty does not go to 0 and there is a still a penalty for being outside the limits
-    offset = np.astype(((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])), int)
+    # offset = np.astype(((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])), int)
+    offset = ((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])).astype(int)
 
     return -(np.sum(lower_lim_dist) + np.sum(upper_lim_dist)) - np.sum(offset)
 

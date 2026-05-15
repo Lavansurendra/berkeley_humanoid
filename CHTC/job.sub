@@ -1,5 +1,5 @@
 universe = container
-container_image = docker://lavansurendra/wiscohumanoids:v3
+container_image = docker://lavansurendra/wiscohumanoids:v4
 docker_pull_policy=always
 
 log = CHTC_logs/$(Cluster).$(Process).log

@@ -3,7 +3,7 @@
 echo "=================================================="
 echo "CHTC START TIME: $(date)"
 echo -n "IMAGE BUILD DATE: "
-# This file is created in your Dockerfile during the 'v3' build
+# This file is created in your Dockerfile during the 'v4' build
 cat /image_build_date.txt || echo "ERROR: Build date file not found."
 echo "=================================================="
 
