@@ -203,8 +203,8 @@ class G1Env(gym.Env):
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
             # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
-        left_thigh_qfrc = 100 * (-np.sin(np.pi * (left_thigh_angle/60)))
-        right_thigh_qfrc = 120 * (-np.sin(np.pi * (right_thigh_angle/60)))
+        left_thigh_qfrc = 80 * (-np.sin(np.pi * (left_thigh_angle/60)))
+        right_thigh_qfrc = 90 * (-np.sin(np.pi * (right_thigh_angle/60)))
         # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
         # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
         # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
