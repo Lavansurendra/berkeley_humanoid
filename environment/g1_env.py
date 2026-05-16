@@ -151,32 +151,35 @@ class G1Env(gym.Env):
 
         
         # ------------ Cyclical Thigh Pushing Logic -----------------
-        # # set the cutoff timestep
-        #     # TODO: change this from being hardcoded to being a parameter
-        # cutoff_timestep = 5000
+        # set the cutoff timestep
+            # TODO: change this from being hardcoded to being a parameter
+        cutoff_timestep = 5000
         
-        # # clear the force applied on each thigh and the pelvis from the previous step
-        # self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
-        # self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
-        # self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+        # clear the force applied on each thigh and the pelvis from the previous step
+        self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
+        self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
+        self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
 
-        # # apply a constant force on the pelvis that cuts off part way through the training
-        # self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
+        # apply a constant force on the pelvis that cuts off part way through the training
+        self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
 
-        # # calculate the force that should be applied at the current time on each thigh
-        #     # NOTE: positive forces make the legs go backwards
-        # left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
-        # right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
+        # calculate the force that should be applied at the current time on each thigh
+            # NOTE: positive forces make the legs go backwards
+        left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
+        right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
 
-        # # set the force being applied for the current time on each thigh
-        # self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
-        # self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
+        # set the force being applied for the current time on each thigh
+        self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
+        self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
 
+        # limits
+        action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5])
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
             # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
             # that the robot cannot execute but those actions outside the joint limits should not actually be tried to be executed to prevent possible calculation explosion exploits
-        clipped_action = np.clip(action, self.joint_lims[:,0], self.joint_lims[:,1])
+        clipped_action = np.clip(action, self.nominal_qpos[7:] - action_scaling_bound, self.nominal_qpos[7:] + action_scaling_bound)
+        # clipped_action = np.clip(action, self.joint_lims[:,0], self.joint_lims[:,1])
         
         # initialize reward value
         total_reward = 0.0
@@ -214,20 +217,24 @@ class G1Env(gym.Env):
             
             
             # calculate penatly terms
-            p_limits = motor_limit_penalty(action, self.joint_lims)
+            # p_limits = motor_limit_penalty(action, self.joint_lims)
+            p_action_diff = action_diff_penalty(action, self.previous_action)
+                        
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 0.1
             w_velocity = 1
-            w_limits = 1
+            # w_limits = 1
+            w_action_diff = 0.05
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
             # w_foot_contact = 0.5
 
             # add to reward
             # total_reward += w_velocity*r_forward + w_limits*p_limits         
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits       
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_action_diff*p_action_diff      
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_foot_lift*r_foot_lift + w_foot_target*r_foot_target + w_foot_contact*r_foot_contact      
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
@@ -238,6 +245,9 @@ class G1Env(gym.Env):
             mujoco.mj_step(self.model, self.data)
         
         self.step_count += 1
+
+        # store the current action as the previous action for the next step so that we can calculate the action difference penalty in the next step
+        self.previous_action = action
 
         # TODO: fix this so the rendering speed is independent from the control frequency
         if self.render_mode == "human" and self.viewer:
@@ -256,7 +266,7 @@ class G1Env(gym.Env):
             truncated = False
         else:
             # Training mode: Reset on fall or at 1000 steps
-            terminated = bool(pelvis_z < 0.3)
+            terminated = bool(pelvis_z < 0.5) + bool(pelvis_z > 1)
             truncated = self.step_count >= 1000 
         
         return obs, total_reward, terminated, truncated, {}
@@ -349,6 +359,10 @@ def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
     velocity_error = abs(forward_velocity - target_velocity)
     return -velocity_error
 
+def action_diff_penalty(action, prev_action):
+
+    return -np.sum(np.abs(action-prev_action))
+
 def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=10.0):
     
     # check if both feet off of ground
@@ -362,7 +376,7 @@ def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right
 
     return left_foot_reward + right_foot_reward
 
-def foot_target_penalty(left_foot_height, right_foot_height, target_height=0.07, left_foot_force=0.0, right_foot_force=0.0, contact_threshold=10.0):
+def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=10.0):
 
     # check if either foot is off the ground
         # NOTE: we assume a foot is off the ground if it's contact force is above a threshold
