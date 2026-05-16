@@ -186,8 +186,8 @@ class G1Env(gym.Env):
 
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
-        left_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * (self.total_steps/40)))
-        right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
+        left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
+        right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
 
         # set the force being applied for the current time on each thigh
         self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
@@ -226,10 +226,10 @@ class G1Env(gym.Env):
             # left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
             # right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
             
-            # # contact force from touch sensors on the feet
-            #     # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
-            # left_foot_force = self.data.sensor("left_foot_touch").data[0]
-            # right_foot_force = self.data.sensor("right_foot_touch").data[0]
+            # contact force from touch sensors on the feet
+                # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
+            left_foot_force = self.data.sensor("left_foot_touch").data[0]
+            right_foot_force = self.data.sensor("right_foot_touch").data[0]
 
             # calculate reward terms
             r_alive = alive_reward()
@@ -238,8 +238,8 @@ class G1Env(gym.Env):
             # r_foot_lift = foot_lift_reward(left_foot_height, right_foot_height)
             # # calculate foot target penalty for keeping feet on the ground or lifting them too high
             # r_foot_target = foot_target_penalty(left_foot_height, right_foot_height)
-            # # calculate a reward depending on if the feet sites are contacting the ground at all
-            # r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
+            # calculate a reward depending on if the feet sites are contacting the ground at all
+            r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
             
             
             # calculate penatly terms
@@ -255,11 +255,12 @@ class G1Env(gym.Env):
             w_action_diff = 0.05
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
-            # w_foot_contact = 0.5
+            w_foot_contact = 0.5
 
             # add to reward
             # total_reward += w_velocity*r_forward + w_limits*p_limits         
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_action_diff*p_action_diff      
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_foot_lift*r_foot_lift + w_foot_target*r_foot_target + w_foot_contact*r_foot_contact      
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
