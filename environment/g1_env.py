@@ -94,13 +94,15 @@ class G1Env(gym.Env):
 
         # # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
         # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-        # in the xml for the keyframe named "step" the robot is in the initial step position
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
-        
+        # # in the xml for the keyframe named "step" the robot is in the initial step position
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
+        # in the xml for the keyframe named "stand" the robot is in a standing position
+        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+
+
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
         self.nominal_qpos = self.model.key_qpos[key_id]
-        # self.nominal_qpos = self.model.key_qpos[key_id][7:]
 
         
         # retrieving the ID for the pelvis body (used for applying random pushes in the step function)
@@ -125,7 +127,6 @@ class G1Env(gym.Env):
         # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
         self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.action_scaling_factor
         self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.action_scaling_factor 
-        # self.npos_delta = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
 
         self.npos_upper = self.nominal_qpos[7:] + self.npos_delta_upper
         self.npos_lower = self.nominal_qpos[7:] - self.npos_delta_lower
@@ -187,31 +188,22 @@ class G1Env(gym.Env):
 
         # apply a constant force on the pelvis that cuts off part way through the training
         self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
-        # self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
 
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
-        left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
-        right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
+        left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * (self.total_steps/50)))
+        right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
+        # left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
+        # right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
+
 
         # set the force being applied for the current time on each thigh
         self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
         self.data.qfrc_applied[12] = right_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right hip pitch joint
-        # self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
-        # self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
-
-        # # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
-        # action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
 
         # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
 
-        # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
-            # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
-            # that the robot cannot execute but those actions outside the joint limits should not actually be tried to be executed to prevent possible calculation explosion exploits
-        # clipped_action = np.clip(action, self.nominal_qpos[7:] - action_scaling_bound, self.nominal_qpos[7:] + action_scaling_bound)
-        # clipped_action = np.clip(action, self.joint_lims[:,0], self.joint_lims[:,1])
-        
         # initialize reward value
         total_reward = 0.0
 
@@ -264,17 +256,12 @@ class G1Env(gym.Env):
             w_pelvis_orientation = 0.5
 
             # add to reward
-            # total_reward += w_velocity*r_forward + w_limits*p_limits         
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
             total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
-            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_action_diff*p_action_diff      
-            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_foot_lift*r_foot_lift + w_foot_target*r_foot_target + w_foot_contact*r_foot_contact      
-            # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = scaled_action
-            # self.data.ctrl[:] = clipped_action
 
             # 6. Step physics
             mujoco.mj_step(self.model, self.data)
@@ -310,12 +297,10 @@ class G1Env(gym.Env):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
         
-        # specifically resetting to the crouching keyframe
-        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-        # self.data.qpos[:] = self.model.key_qpos[key_id]
+        # specifically resetting to the nominal pose
         self.data.qpos[:] = self.nominal_qpos
 
-        # when we reset to the crouching keyframe we must also reset the control array to match the crouching pose
+        # when we reset to the nominal pose we must also reset the control array to match the nominal pose
         # so that the PD controllers in the xml file dont apply huge forces trying to get the robot to the target pose defined by the control array which would cause it to explode on reset
         # NOTE: here because the control values necessarily must be the same as the nominal position values, we can reset the control values using teh nominal position values
         self.data.ctrl[:] = self.nominal_qpos[7:]
@@ -362,42 +347,56 @@ class G1Env(gym.Env):
 
 # ======================================================= Rewards =========================================================
 
-def motor_limit_penalty(action, joint_lims):
+# def motor_limit_penalty(action, joint_lims):
 
-    '''
-    Penalize the agent if the action is outside the joint limitations
-    The reason we are adding this reward is because we want the learning policy to have no limitations on the action values it can output
-    so that it can explore the full range of possible actions and find the best ones that maximize the reward however we also
-    need it to learn that it should only output values that are actually possible for the robot to execute hence the penalty
-    '''
+#     '''
+#     Penalize the agent if the action is outside the joint limitations
+#     The reason we are adding this reward is because we want the learning policy to have no limitations on the action values it can output
+#     so that it can explore the full range of possible actions and find the best ones that maximize the reward however we also
+#     need it to learn that it should only output values that are actually possible for the robot to execute hence the penalty
+#     '''
     
-    # calculate the distance between the angular positions specified in the action vector and the lower and upper limits of the joint rangees of motion
-    lower_lim_dist = np.abs(np.minimum(action - joint_lims[:,0], np.zeros_like(action)))
-    upper_lim_dist = np.maximum(action - joint_lims[:,1], np.zeros_like(action))
+#     # calculate the distance between the angular positions specified in the action vector and the lower and upper limits of the joint rangees of motion
+#     lower_lim_dist = np.abs(np.minimum(action - joint_lims[:,0], np.zeros_like(action)))
+#     upper_lim_dist = np.maximum(action - joint_lims[:,1], np.zeros_like(action))
 
-    # calculate an offset term so that as the actions get closer to being inside the limits the penalty does not go to 0 and there is a still a penalty for being outside the limits
-    # offset = np.astype(((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])), int)
-    offset = ((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])).astype(int)
+#     # calculate an offset term so that as the actions get closer to being inside the limits the penalty does not go to 0 and there is a still a penalty for being outside the limits
+#     offset = ((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])).astype(int)
 
-    return -(np.sum(lower_lim_dist) + np.sum(upper_lim_dist)) - np.sum(offset)
+#     return -(np.sum(lower_lim_dist) + np.sum(upper_lim_dist)) - np.sum(offset)
 
 def alive_reward():
+
     return 1.0
-
-def forward_motion_reward(forward_velocity):
-
-    return forward_velocity
-
-
-def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
-
-    velocity_error = abs(forward_velocity - target_velocity)
-    return -velocity_error
 
 def action_diff_penalty(action, prev_action):
 
     return -np.sum(np.abs(action-prev_action))
 
+def forward_motion_reward(forward_velocity):
+
+    return forward_velocity
+
+def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=50.0):
+
+    # reward for having one foot not in contact with the ground but not both feet off the ground
+        # NOTE: we assume a foot is off the ground if it's contact force is below a threshold
+    foot_contact_reward = ((left_foot_force<contact_threshold) + (right_foot_force<contact_threshold))%2
+
+    return foot_contact_reward
+
+def pelvis_orientation_penalty(pelvis_orientation, target_orientation = np.array([1, 0, 0, 0])):
+
+    # penalize the policy for having pelvis orientation close to perfectly upright
+    pelvis_orientation_penalty = - np.sum(np.abs(pelvis_orientation - target_orientation))
+
+    return pelvis_orientation_penalty
+
+
+# def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
+
+#     velocity_error = abs(forward_velocity - target_velocity)
+#     return -velocity_error
 
 def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=50.0):
     
@@ -425,20 +424,7 @@ def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, ri
 
     return left_foot_reward + right_foot_reward
 
-def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=50.0):
 
-    # reward for having one foot not in contact with the ground but not both feet off the ground
-        # NOTE: we assume a foot is off the ground if it's contact force is below a threshold
-    foot_contact_reward = ((left_foot_force<contact_threshold) + (right_foot_force<contact_threshold))%2
-
-    return foot_contact_reward
-
-def pelvis_orientation_penalty(pelvis_orientation, target_orientation = np.array([1, 0, 0, 0])):
-
-    # penalize the policy for having pelvis orientation close to perfectly upright
-    pelvis_orientation_penalty = - np.sum(np.abs(pelvis_orientation - target_orientation))
-
-    return pelvis_orientation_penalty
 
 def feet_slide_reward(model, data, foot_body_ids, action):
 
