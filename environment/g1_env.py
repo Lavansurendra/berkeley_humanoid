@@ -103,10 +103,21 @@ class G1Env(gym.Env):
         # This variable will track the total number of steps taken across all episodes, which we can use to scale the difficulty of the random pushes over time (curriculum learning)
         self.total_steps = 0
 
+        # defining a lower and upper bound for the spaces.Box. We currently believe that the actions of the policy are limited so that they always fall within this range via clipping
+            # TODO: determine if this is actually done by direct clipping or through the application of some function who's range is limited to this range such as tanh.
+        self.box_low = -1.0
+        self.box_high = 1.0
+
         # NOTE: we are changing the upper and lower limits of the action space to be greater than the largest and smaller than the smallest joint limitation
             # this will ensure that the learning policy can output any value as the mean and so explore the effects of many different actions
-        self.action_space = spaces.Box(low=-5.0, high=5.0, shape=(self.num_actions,), dtype=np.float32)
+        self.action_space = spaces.Box(low=self.box_low, high=self.box_high, shape=(self.num_actions,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_obs,), dtype=np.float32)
+
+        # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
+        self.npos_delta = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
+
+        self.npos_upper = self.nominal_qpos[7:] + self.npos_delta
+        self.npos_lower = self.nominal_qpos[7:] - self.npos_delta
 
         self.render_mode = render_mode
         if self.render_mode == "human":
@@ -169,16 +180,21 @@ class G1Env(gym.Env):
         right_thigh_qfrc = 60 * max(0, np.sin((2*np.pi) * ((self.total_steps - 20)/40)))
 
         # set the force being applied for the current time on each thigh
-        self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
-        self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
+        self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
+        self.data.qfrc_applied[12] = right_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right hip pitch joint
+        # self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
+        # self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
 
-        # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
-        action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
+        # # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
+        # action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
+
+        # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
+        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
             # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
             # that the robot cannot execute but those actions outside the joint limits should not actually be tried to be executed to prevent possible calculation explosion exploits
-        clipped_action = np.clip(action, self.nominal_qpos[7:] - action_scaling_bound, self.nominal_qpos[7:] + action_scaling_bound)
+        # clipped_action = np.clip(action, self.nominal_qpos[7:] - action_scaling_bound, self.nominal_qpos[7:] + action_scaling_bound)
         # clipped_action = np.clip(action, self.joint_lims[:,0], self.joint_lims[:,1])
         
         # initialize reward value
@@ -239,7 +255,8 @@ class G1Env(gym.Env):
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
-            self.data.ctrl[:] = clipped_action
+            self.data.ctrl[:] = scaled_action
+            # self.data.ctrl[:] = clipped_action
 
             # 6. Step physics
             mujoco.mj_step(self.model, self.data)
