@@ -78,7 +78,7 @@ class G1Env(gym.Env):
         self.num_obs = 68
 
         # initialize an array to hold the lower and upper limits of the range of motion of each joint (excluding the freejoint) in radians relative to the joint reference points (right now set to 0 rad)
-            # NOTE: the joint limits for the hip pitch joints were both artificially adjusted from their previous values of (-2.5307 2.8798)
+            # NOTE: the joint limits for the hip pitch joints were both artificially adjusted to (-0.7, 0.7) from their previous values of (-2.5307, 2.8798)
         self.joint_lims = np.array(
             [[-0.7, 0.7], [-0.5236, 2.9671], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
             [-0.7, 0.7], [-2.9671, 0.5236], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
@@ -248,7 +248,7 @@ class G1Env(gym.Env):
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
-            w_alive = 0.1
+            w_alive = 1
             w_velocity = 1
             # w_limits = 1
             w_action_diff = 0.05
@@ -389,7 +389,8 @@ def action_diff_penalty(action, prev_action):
 
     return -np.sum(np.abs(action-prev_action))
 
-def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=10.0):
+
+def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=50.0):
     
     # check if both feet off of ground
     left_foot_force_below_threshold = left_foot_force < contact_threshold
@@ -402,7 +403,7 @@ def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right
 
     return left_foot_reward + right_foot_reward
 
-def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=10.0):
+def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=50.0):
 
     # check if either foot is off the ground
         # NOTE: we assume a foot is off the ground if it's contact force is above a threshold
@@ -415,9 +416,9 @@ def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, ri
 
     return left_foot_reward + right_foot_reward
 
-def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=10.0):
+def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=50.0):
 
-    # reward for having at least one foot not in contact with the ground but not both feet off the ground
+    # reward for having one foot not in contact with the ground but not both feet off the ground
         # NOTE: we assume a foot is off the ground if it's contact force is below a threshold
     foot_contact_reward = ((left_foot_force<contact_threshold) + (right_foot_force<contact_threshold))%2
 
