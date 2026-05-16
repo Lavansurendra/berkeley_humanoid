@@ -189,10 +189,18 @@ class G1Env(gym.Env):
         # apply a constant force on the pelvis that cuts off part way through the training
         self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
 
+        # apply a cyclical force on the pelvis in the y direction that cuts off part way through the training (this gets the foot ground clearance to swing)
+            # NOTE: the force needs to act in the opposite direction from the direction you want the pelvis to swing (when the left foot is swinging, the pelvis needs to move right so the force should act left)
+            # NOTE: a positive force corresponds to a force left
+        self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
+
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
-        left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * (self.total_steps/50)))
-        right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
+            # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
+        left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
+        right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
+        # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
+        # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
         # left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
         # right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
 
