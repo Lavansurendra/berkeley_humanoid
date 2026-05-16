@@ -197,8 +197,8 @@ class G1Env(gym.Env):
         self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
 
         # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
-        left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/50))
-        right_thigh_angle = 30*np.cos(2*np.pi*((self.total_steps - 25)/50))
+        left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/80))
+        right_thigh_angle = 30*np.cos(2*np.pi*((self.total_steps - 40)/80))
 
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
@@ -224,8 +224,8 @@ class G1Env(gym.Env):
         self.data.qfrc_applied[15] = 0.0 # right knee pitch joint
 
         # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
-        left_knee_angle = 50*max(0, np.sin(2*np.pi*(self.total_steps/50)))
-        right_knee_angle = 50*max(0, np.sin(2*np.pi*((self.total_steps - 25)/50)))
+        left_knee_angle = 50*max(0, np.sin(2*np.pi*(self.total_steps/80)))
+        right_knee_angle = 50*max(0, np.sin(2*np.pi*((self.total_steps - 40)/80)))
 
 
         # calculate the force that should be applied at the current time on each knee
