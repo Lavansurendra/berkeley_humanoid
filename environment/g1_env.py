@@ -78,15 +78,15 @@ class G1Env(gym.Env):
         self.num_obs = 68
 
         # initialize an array to hold the lower and upper limits of the range of motion of each joint (excluding the freejoint) in radians relative to the joint reference points (right now set to 0 rad)
-            # NOTE: the joint limits for the hip pitch joints were both artificially adjusted to (-0.7, 0.7) from their previous values of (-2.5307, 2.8798)
+            # NOTE: the joint limits for the hip pitch joints were both artificially adjusted to (-1, 1) from their previous values of (-2.5307, 2.8798)
             # NOTE: the joint limits for the hip roll joints were both artificially adjusted to (-0.5, 0.1) from their previous values of (-2.9671 0.5236)
             # NOTE: the joint limits for both arms were fixed to the nominal position
             # NOTE: the joint limit for the hip yaw joints were both artificially adjusted to (-0.1, 0.1) from their previous values of (-2.7576, 2.7576)
             # NOTE: the joint limits for the waist yaw joint was artificially adjusted to (-0.3, 0.3) from it's previous values of (-2.618, 2.618)
             # NOTE: the joint limits for the waist roll joint was artificially adjusted to (-0.2, 0.2) from it's previous values of (-0.52, 0.52)
         self.joint_lims = np.array(
-            [[-0.7, 0.7], [-0.5, 0.1], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-            [-0.7, 0.7], [-0.1, 0.5], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [[-1, 1], [-0.5, 0.1], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-1, 1], [-0.1, 0.5], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
             [-0.3, 0.3], [-0.2, 0.2], [-0.52, 0.52], 
             [0.2, 0.2], [0.2, 0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0], 
             [0.2, 0.2], [-0.2, -0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0]])
@@ -158,22 +158,22 @@ class G1Env(gym.Env):
         # this way, the agent starts with easier conditions and gradually faces more challenging perturbations as it learns.
         self.total_steps += 1
         
-        # --- RANDOMIZED PUSH LOGIC ---
-        # Clear external forces from the previous step
-        self.data.xfrc_applied[self.pelvis_id, :] = 0.0
+        # # --- RANDOMIZED PUSH LOGIC ---
+        # # Clear external forces from the previous step
+        # self.data.xfrc_applied[self.pelvis_id, :] = 0.0
         
-        # 0.5% chance to push per action (~once every 200 actions / 10 seconds)
-        if self.np_random.uniform() < 0.005:
-            # Curriculum scale: Starts at 10N, maxes out at 50N at 1,000,000 steps
-            progress = min(1.0, self.total_steps / 1_000_000.0) # TODO: dividing by 1 million here is wrong, we usually only do 10000 timesteps per environment
-            current_max_force = 10.0 + (40.0 * progress) 
+        # # 0.5% chance to push per action (~once every 200 actions / 10 seconds)
+        # if self.np_random.uniform() < 0.005:
+        #     # Curriculum scale: Starts at 10N, maxes out at 50N at 1,000,000 steps
+        #     progress = min(1.0, self.total_steps / 1_000_000.0) # TODO: dividing by 1 million here is wrong, we usually only do 10000 timesteps per environment
+        #     current_max_force = 10.0 + (40.0 * progress) 
             
-            force_x = self.np_random.uniform(-current_max_force, current_max_force)
-            force_y = self.np_random.uniform(-current_max_force, current_max_force)
+        #     force_x = self.np_random.uniform(-current_max_force, current_max_force)
+        #     force_y = self.np_random.uniform(-current_max_force, current_max_force)
             
-            # Apply to Torso (Indices 0, 1 are Fx, Fy)
-            self.data.xfrc_applied[self.pelvis_id, 0] = force_x
-            self.data.xfrc_applied[self.pelvis_id, 1] = force_y
+        #     # Apply to Torso (Indices 0, 1 are Fx, Fy)
+        #     self.data.xfrc_applied[self.pelvis_id, 0] = force_x
+        #     self.data.xfrc_applied[self.pelvis_id, 1] = force_y
 
         
         # ------------ Cyclical Thigh Pushing Logic -----------------
@@ -185,6 +185,7 @@ class G1Env(gym.Env):
         self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
         self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
         self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+        self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
 
         # apply a constant force on the pelvis that cuts off part way through the training
         self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
@@ -194,11 +195,17 @@ class G1Env(gym.Env):
             # NOTE: a positive force corresponds to a force left
         self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
 
+        # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
+        left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/50))
+        right_thigh_angle = 30*np.cos(2*np.pi*((self.total_steps - 25)/50))
+
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
             # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
-        left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
-        right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
+        left_thigh_qfrc = 80 * (-np.sin(np.pi * (left_thigh_angle/60)))
+        right_thigh_qfrc = 80 * (-np.sin(np.pi * (right_thigh_angle/60)))
+        # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
+        # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
         # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
         # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
         # left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
@@ -208,6 +215,28 @@ class G1Env(gym.Env):
         # set the force being applied for the current time on each thigh
         self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
         self.data.qfrc_applied[12] = right_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right hip pitch joint
+
+        # ------------ Cyclical Knee Pushing Logic -----------------
+        
+        # clear the force applied on each thigh and the pelvis from the previous step
+        self.data.qfrc_applied[9] = 0.0 # left knee pitch joint
+        self.data.qfrc_applied[15] = 0.0 # right knee pitch joint
+
+        # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
+        left_knee_angle = 50*max(0, np.sin(2*np.pi*(self.total_steps/50)))
+        right_knee_angle = 50*max(0, np.sin(2*np.pi*((self.total_steps - 25)/50)))
+
+
+        # calculate the force that should be applied at the current time on each knee
+            # NOTE: positive forces make the shin go backwards
+        # left_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 5)/50))
+        # right_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 30)/50))
+        left_knee_qfrc = 40 * (-np.sin(np.pi * ((left_knee_angle - 25)/50)))
+        right_knee_qfrc = 40 * (-np.sin(np.pi * ((right_knee_angle - 25)/50)))
+
+        # set the force being applied for the current time on each knee
+        self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
+        self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
         # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
@@ -292,7 +321,7 @@ class G1Env(gym.Env):
         
         if self.render_mode == "human":
             # Playback mode: Never reset, let it run infinitely
-            terminated = False
+            terminated = bool(pelvis_z < 0.5) + bool(pelvis_z > 1)
             truncated = False
         else:
             # Training mode: Reset on fall or at 1000 steps
@@ -329,7 +358,12 @@ class G1Env(gym.Env):
 
         # we then allow the physics engine to step forward a few times to let the robot settle into the new pose after reset before we start returning observations and rewards to the agent. 
         # This is important because right after reset the robot might be in an unstable state and we dont want to penalize the agent for that or return observations that are not representative of the state it will actually be in when it starts taking actions.
-        for _ in range(10):
+        for _ in range(125):
+            
+            # apply the kicking force to begin the walking motion
+            self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+            self.data.xfrc_applied[self.pelvis_id, 0] = 20
+            
             mujoco.mj_step(self.model, self.data)
             
         return self._get_obs(), {}
