@@ -86,10 +86,10 @@ class G1Env(gym.Env):
             [-1.0472, 2.0944], [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443]])
 
 
-        # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
-        # # in the xml for the keyframe named "step" the robot is in the initial step position
-        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
+        # # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
+        # in the xml for the keyframe named "step" the robot is in the initial step position
+        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
         
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
@@ -113,11 +113,16 @@ class G1Env(gym.Env):
         self.action_space = spaces.Box(low=self.box_low, high=self.box_high, shape=(self.num_actions,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_obs,), dtype=np.float32)
 
-        # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
-        self.npos_delta = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
+        # define a scaling factor which will be used to determine the range of values surrounding the nominal pose that the action given by the policy (and clipped by the spaces.Box) will be scaled to.
+        self.action_scaling_factor = 0.9
 
-        self.npos_upper = self.nominal_qpos[7:] + self.npos_delta
-        self.npos_lower = self.nominal_qpos[7:] - self.npos_delta
+        # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
+        self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.action_scaling_factor
+        self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.action_scaling_factor 
+        # self.npos_delta = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
+
+        self.npos_upper = self.nominal_qpos[7:] + self.npos_delta_upper
+        self.npos_lower = self.nominal_qpos[7:] - self.npos_delta_lower
 
         self.render_mode = render_mode
         if self.render_mode == "human":
@@ -164,7 +169,7 @@ class G1Env(gym.Env):
         # ------------ Cyclical Thigh Pushing Logic -----------------
         # set the cutoff timestep
             # TODO: change this from being hardcoded to being a parameter
-        cutoff_timestep = 5000
+        cutoff_timestep = 10000
         
         # clear the force applied on each thigh and the pelvis from the previous step
         self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
