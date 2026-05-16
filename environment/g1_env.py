@@ -96,9 +96,10 @@ class G1Env(gym.Env):
         # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
         # # in the xml for the keyframe named "step" the robot is in the initial step position
         # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
-        # in the xml for the keyframe named "stand" the robot is in a standing position
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "stand")
-
+        # # in the xml for the keyframe named "stand" the robot is in a standing position
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "stand")
+        # in the xml for the keyframe named "half_step" the robot is in the middle of taking a step
+        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "half_step")
 
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
