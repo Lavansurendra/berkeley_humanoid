@@ -255,7 +255,7 @@ class G1Env(gym.Env):
 
             # reward term weights
             w_alive = 1
-            w_velocity = 1 * (self.total_steps/cutoff_timestep)
+            w_velocity = 1
             # w_limits = 1
             w_action_diff = 0.05
             # w_foot_lift = 0.5
