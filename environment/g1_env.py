@@ -79,9 +79,10 @@ class G1Env(gym.Env):
 
         # initialize an array to hold the lower and upper limits of the range of motion of each joint (excluding the freejoint) in radians relative to the joint reference points (right now set to 0 rad)
             # NOTE: the joint limits for the hip pitch joints were both artificially adjusted to (-0.7, 0.7) from their previous values of (-2.5307, 2.8798)
+            # NOTE: the joint limits for the hip roll joints were both artificially adjusted to (-0.5, 0.1) from their previous values of (-2.9671 0.5236)
         self.joint_lims = np.array(
-            [[-0.7, 0.7], [-0.5236, 2.9671], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-            [-0.7, 0.7], [-2.9671, 0.5236], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [[-0.7, 0.7], [-0.5, 0.1], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-0.7, 0.7], [-0.1, 0.5], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
             [-2.618, 2.618], [-0.52, 0.52], [-0.52, 0.52], [-3.0892, 2.6704], [-1.5882, 2.2515], [-2.618, 2.618], [-1.0472, 2.0944],
             [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443], [-3.0892, 2.6704], [-2.2515, 1.5882], [-2.618, 2.61],
             [-1.0472, 2.0944], [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443]])
