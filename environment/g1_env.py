@@ -83,9 +83,9 @@ class G1Env(gym.Env):
         self.joint_lims = np.array(
             [[-0.7, 0.7], [-0.5, 0.1], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
             [-0.7, 0.7], [-0.1, 0.5], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-            [-2.618, 2.618], [-0.52, 0.52], [-0.52, 0.52], [-3.0892, 2.6704], [-1.5882, 2.2515], [-2.618, 2.618], [-1.0472, 2.0944],
-            [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443], [-3.0892, 2.6704], [-2.2515, 1.5882], [-2.618, 2.61],
-            [-1.0472, 2.0944], [-1.97222, 1.97222], [-1.61443, 1.61443], [-1.61443, 1.61443]])
+            [-2.618, 2.618], [-0.52, 0.52], [-0.52, 0.52], 
+            [0.2, 0.2], [0.2, 0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0], 
+            0.2, 0.2], [-0.2, -0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0])
 
 
         # # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
@@ -245,7 +245,7 @@ class G1Env(gym.Env):
             # calculate penatly terms
             # p_limits = motor_limit_penalty(action, self.joint_lims)
             p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
-                        
+            p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7])
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
@@ -256,11 +256,13 @@ class G1Env(gym.Env):
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
             w_foot_contact = 0.5
+            w_pelvis_orientation = 0.5
 
             # add to reward
             # total_reward += w_velocity*r_forward + w_limits*p_limits         
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_action_diff*p_action_diff      
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_limits*p_limits + w_foot_lift*r_foot_lift + w_foot_target*r_foot_target + w_foot_contact*r_foot_contact      
             # total_reward += w_alive*r_alive + w_velocity*px_velocity + w_velocity*r_forward + w_limits*p_limits         
@@ -426,6 +428,13 @@ def foot_contact_reward(left_foot_force, right_foot_force, contact_threshold=50.
 
     return foot_contact_reward
 
+def pelvis_orientation_penalty(pelvis_orientation, target_orientation = np.array([1, 0, 0, 0])):
+
+    # penalize the policy for having pelvis orientation close to perfectly upright
+    pelvis_orientation_penalty = - np.sum(np.abs(pelvis_orientation - target_orientation))
+
+    return pelvis_orientation_penalty
+
 def feet_slide_reward(model, data, foot_body_ids, action):
 
     sliding_penalty = 0.0
@@ -449,4 +458,4 @@ def feet_slide_reward(model, data, foot_body_ids, action):
             # Penalize the magnitude of velocity while in contact
             sliding_penalty += vel_norm
             
-    return -sliding_penalty # Negative because it's a penalt
+    return -sliding_penalty # Negative because it's a penalty
