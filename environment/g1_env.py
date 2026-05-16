@@ -105,6 +105,7 @@ class G1Env(gym.Env):
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
         self.nominal_qpos = self.model.key_qpos[key_id]
 
+        self.crouch_qpos = self.model.key_qpos[mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")]
         
         # retrieving the ID for the pelvis body (used for applying random pushes in the step function)
         self.pelvis_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'pelvis')
@@ -177,67 +178,67 @@ class G1Env(gym.Env):
         #     self.data.xfrc_applied[self.pelvis_id, 1] = force_y
 
         
-        # ------------ Cyclical Thigh Pushing Logic -----------------
-        # set the cutoff timestep
-            # TODO: change this from being hardcoded to being a parameter
-        cutoff_timestep = 10000
+        # # ------------ Cyclical Thigh Pushing Logic -----------------
+        # # set the cutoff timestep
+        #     # TODO: change this from being hardcoded to being a parameter
+        # cutoff_timestep = 10000
         
-        # clear the force applied on each thigh and the pelvis from the previous step
-        self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
-        self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
-        self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
-        self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
+        # # clear the force applied on each thigh and the pelvis from the previous step
+        # self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
+        # self.data.qfrc_applied[12] = 0.0 # right hip pitch joint
+        # self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+        # self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
 
-        # apply a constant force on the pelvis that cuts off part way through the training
-        self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
+        # # apply a constant force on the pelvis that cuts off part way through the training
+        # self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
 
-        # apply a cyclical force on the pelvis in the y direction that cuts off part way through the training (this gets the foot ground clearance to swing)
-            # NOTE: the force needs to act in the opposite direction from the direction you want the pelvis to swing (when the left foot is swinging, the pelvis needs to move right so the force should act left)
-            # NOTE: a positive force corresponds to a force left
-        self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
+        # # apply a cyclical force on the pelvis in the y direction that cuts off part way through the training (this gets the foot ground clearance to swing)
+        #     # NOTE: the force needs to act in the opposite direction from the direction you want the pelvis to swing (when the left foot is swinging, the pelvis needs to move right so the force should act left)
+        #     # NOTE: a positive force corresponds to a force left
+        # self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
 
-        # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
-        left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/80))
-        right_thigh_angle = 30*np.cos(2*np.pi*((self.total_steps - 40)/80))
+        # # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
+        # left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/80))
+        # right_thigh_angle = 30*np.cos(2*np.pi*((self.total_steps - 40)/80))
 
-        # calculate the force that should be applied at the current time on each thigh
-            # NOTE: positive forces make the legs go backwards
-            # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
-        left_thigh_qfrc = 80 * (-np.sin(np.pi * (left_thigh_angle/60)))
-        right_thigh_qfrc = 90 * (-np.sin(np.pi * (right_thigh_angle/60)))
-        # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
-        # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
-        # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
-        # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
-        # left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
-        # right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
+        # # calculate the force that should be applied at the current time on each thigh
+        #     # NOTE: positive forces make the legs go backwards
+        #     # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
+        # left_thigh_qfrc = 80 * (-np.sin(np.pi * (left_thigh_angle/60)))
+        # right_thigh_qfrc = 90 * (-np.sin(np.pi * (right_thigh_angle/60)))
+        # # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
+        # # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
+        # # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
+        # # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 25)/50)))
+        # # left_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * (self.total_steps/50)))
+        # # right_thigh_qfrc = 80 * max(0, np.sin((2*np.pi) * ((self.total_steps - 25)/50)))
 
 
-        # set the force being applied for the current time on each thigh
-        self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
-        self.data.qfrc_applied[12] = right_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right hip pitch joint
+        # # set the force being applied for the current time on each thigh
+        # self.data.qfrc_applied[6] = left_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left hip pitch joint
+        # self.data.qfrc_applied[12] = right_thigh_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right hip pitch joint
 
-        # ------------ Cyclical Knee Pushing Logic -----------------
+        # # ------------ Cyclical Knee Pushing Logic -----------------
         
-        # clear the force applied on each thigh and the pelvis from the previous step
-        self.data.qfrc_applied[9] = 0.0 # left knee pitch joint
-        self.data.qfrc_applied[15] = 0.0 # right knee pitch joint
+        # # clear the force applied on each thigh and the pelvis from the previous step
+        # self.data.qfrc_applied[9] = 0.0 # left knee pitch joint
+        # self.data.qfrc_applied[15] = 0.0 # right knee pitch joint
 
-        # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
-        left_knee_angle = 50*max(0, np.sin(2*np.pi*(self.total_steps/80)))
-        right_knee_angle = 50*max(0, np.sin(2*np.pi*((self.total_steps - 40)/80)))
+        # # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
+        # left_knee_angle = 50*max(0, np.sin(2*np.pi*(self.total_steps/80)))
+        # right_knee_angle = 50*max(0, np.sin(2*np.pi*((self.total_steps - 40)/80)))
 
 
-        # calculate the force that should be applied at the current time on each knee
-            # NOTE: positive forces make the shin go backwards
-        # left_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 5)/50))
-        # right_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 30)/50))
-        left_knee_qfrc = 60 * (-np.sin(np.pi * ((left_knee_angle - 25)/50)))
-        right_knee_qfrc = 80 * (-np.sin(np.pi * ((right_knee_angle - 25)/50)))
+        # # calculate the force that should be applied at the current time on each knee
+        #     # NOTE: positive forces make the shin go backwards
+        # # left_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 5)/50))
+        # # right_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 30)/50))
+        # left_knee_qfrc = 60 * (-np.sin(np.pi * ((left_knee_angle - 25)/50)))
+        # right_knee_qfrc = 80 * (-np.sin(np.pi * ((right_knee_angle - 25)/50)))
 
-        # set the force being applied for the current time on each knee
-        self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
-        self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
+        # # set the force being applied for the current time on each knee
+        # self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
+        # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
         # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
@@ -247,6 +248,9 @@ class G1Env(gym.Env):
 
         # set number of timesteps per action
         num_timesteps = 25
+
+
+
 
         # --- PHYSICS LOOP ---
         # NOTE: the number set here in this loop in combination with the timestep length set in the scene.xml file determines the control frequency of the robot
@@ -274,13 +278,14 @@ class G1Env(gym.Env):
             # # calculate foot target penalty for keeping feet on the ground or lifting them too high
             # r_foot_target = foot_target_penalty(left_foot_height, right_foot_height)
             # calculate a reward depending on if the feet sites are contacting the ground at all
-            r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
+            # r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
             
             
             # calculate penatly terms
             # p_limits = motor_limit_penalty(action, self.joint_lims)
             p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
             p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7])
+            p_target_pose_deviation = target_pose_deviation_penalty(self.data.qpos, self.crouch_qpos, self.total_steps)
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
@@ -290,13 +295,16 @@ class G1Env(gym.Env):
             w_action_diff = 0.05
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
-            w_foot_contact = 0.5
+            # w_foot_contact = 0.5
             w_pelvis_orientation = 0.5
+            w_target_pose_deviation = 1
 
             # add to reward
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = scaled_action
@@ -453,6 +461,13 @@ def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right
     right_foot_reward = right_foot_height *(1-both_feet_off_ground)
 
     return left_foot_reward + right_foot_reward
+
+def target_pose_deviation_penalty(qpos, target_qpos, total_steps):
+
+    # calculate the deviation of the current pose from the nominal pose
+    pose_deviation = np.sum(np.abs(qpos - target_qpos))
+
+    return -pose_deviation
 
 def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=50.0):
 
