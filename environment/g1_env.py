@@ -133,6 +133,9 @@ class G1Env(gym.Env):
 
         self.step_count = 0
 
+        # initializing the previous action to be the nominal position of the joints so that the action difference penalty is 0 at the first step and the learning policy does not get penalized for its first action being very different from the nominal pose
+        self.previous_action = self.nominal_qpos[7:]
+
     def step(self, action):
         '''
         Inputs
@@ -239,7 +242,7 @@ class G1Env(gym.Env):
             
             # calculate penatly terms
             # p_limits = motor_limit_penalty(action, self.joint_lims)
-            p_action_diff = action_diff_penalty(action, self.previous_action)
+            p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
                         
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
@@ -269,7 +272,7 @@ class G1Env(gym.Env):
         self.step_count += 1
 
         # store the current action as the previous action for the next step so that we can calculate the action difference penalty in the next step
-        self.previous_action = action
+        self.previous_action = scaled_action
 
         # TODO: fix this so the rendering speed is independent from the control frequency
         if self.render_mode == "human" and self.viewer:
