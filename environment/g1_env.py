@@ -81,10 +81,13 @@ class G1Env(gym.Env):
             # NOTE: the joint limits for the hip pitch joints were both artificially adjusted to (-0.7, 0.7) from their previous values of (-2.5307, 2.8798)
             # NOTE: the joint limits for the hip roll joints were both artificially adjusted to (-0.5, 0.1) from their previous values of (-2.9671 0.5236)
             # NOTE: the joint limits for both arms were fixed to the nominal position
+            # NOTE: the joint limit for the hip yaw joints were both artificially adjusted to (-0.1, 0.1) from their previous values of (-2.7576, 2.7576)
+            # NOTE: the joint limits for the waist yaw joint was artificially adjusted to (-0.3, 0.3) from it's previous values of (-2.618, 2.618)
+            # NOTE: the joint limits for the waist roll joint was artificially adjusted to (-0.2, 0.2) from it's previous values of (-0.52, 0.52)
         self.joint_lims = np.array(
-            [[-0.7, 0.7], [-0.5, 0.1], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-            [-0.7, 0.7], [-0.1, 0.5], [-2.7576, 2.7576], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-            [-2.618, 2.618], [-0.52, 0.52], [-0.52, 0.52], 
+            [[-0.7, 0.7], [-0.5, 0.1], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-0.7, 0.7], [-0.1, 0.5], [-0.1, 0.1], [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
+            [-0.3, 0.3], [-0.2, 0.2], [-0.52, 0.52], 
             [0.2, 0.2], [0.2, 0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0], 
             [0.2, 0.2], [-0.2, -0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0]])
 
@@ -183,7 +186,8 @@ class G1Env(gym.Env):
         self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
 
         # apply a constant force on the pelvis that cuts off part way through the training
-        self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
+        self.data.xfrc_applied[self.pelvis_id, 0] = 20 * (1 - (self.total_steps / cutoff_timestep))
+        # self.data.xfrc_applied[self.pelvis_id, 0] = 10 * (self.total_steps < cutoff_timestep)
 
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
@@ -251,7 +255,7 @@ class G1Env(gym.Env):
 
             # reward term weights
             w_alive = 1
-            w_velocity = 1
+            w_velocity = 1 * (self.total_steps/cutoff_timestep)
             # w_limits = 1
             w_action_diff = 0.05
             # w_foot_lift = 0.5
