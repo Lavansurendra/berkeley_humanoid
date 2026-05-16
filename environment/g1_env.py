@@ -172,8 +172,8 @@ class G1Env(gym.Env):
         self.data.qfrc_applied[6] = left_thigh_qfrc * (self.total_steps < cutoff_timestep) # left hip pitch joint
         self.data.qfrc_applied[12] = right_thigh_qfrc * (self.total_steps < cutoff_timestep) # right hip pitch joint
 
-        # limits
-        action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5])
+        # define bounds for the action clipping range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
+        action_scaling_bound = np.array([2, 0.5, 2.5, 0.5, 0.5, 0.25, 2, 0.5, 2.5, 0.5, 0.5, 0.25, 2.5, 0.5, 0.5, 2, 1.5, 2.5, 0.5, 1.5, 1.5, 1.5, 0, 0, 0, 0, 0, 0, 0])
 
         # clip the action so that the robot will not try to execute things it cannot do causing bodies to superpose and everything break
             # NOTE: we are still going to supply the unclipped action to the reward function so the learning policy learns to not output actions
