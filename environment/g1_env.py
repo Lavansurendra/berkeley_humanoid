@@ -203,8 +203,8 @@ class G1Env(gym.Env):
         # calculate the force that should be applied at the current time on each thigh
             # NOTE: positive forces make the legs go backwards
             # NOTE: there is a slight time delay between the force being applied to the thighs that would cause them to swing and the force on the pelvis in the y direction and that allows there to be some ground clearnace before the thigh swing begins
-        left_thigh_qfrc = 80 * (-np.sin(np.pi * (left_thigh_angle/60)))
-        right_thigh_qfrc = 80 * (-np.sin(np.pi * (right_thigh_angle/60)))
+        left_thigh_qfrc = 100 * (-np.sin(np.pi * (left_thigh_angle/60)))
+        right_thigh_qfrc = 120 * (-np.sin(np.pi * (right_thigh_angle/60)))
         # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 5)/50)))
         # right_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps - 30)/50)))
         # left_thigh_qfrc = 80 * max(0, np.cos((2*np.pi) * ((self.total_steps)/50)))
@@ -232,8 +232,8 @@ class G1Env(gym.Env):
             # NOTE: positive forces make the shin go backwards
         # left_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 5)/50))
         # right_knee_qfrc = 40 * np.sin((2*np.pi) * ((self.total_steps - 30)/50))
-        left_knee_qfrc = 40 * (-np.sin(np.pi * ((left_knee_angle - 25)/50)))
-        right_knee_qfrc = 40 * (-np.sin(np.pi * ((right_knee_angle - 25)/50)))
+        left_knee_qfrc = 60 * (-np.sin(np.pi * ((left_knee_angle - 25)/50)))
+        right_knee_qfrc = 80 * (-np.sin(np.pi * ((right_knee_angle - 25)/50)))
 
         # set the force being applied for the current time on each knee
         self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
@@ -322,7 +322,7 @@ class G1Env(gym.Env):
         
         if self.render_mode == "human":
             # Playback mode: Never reset, let it run infinitely
-            terminated = bool(pelvis_z < 0.5) + bool(pelvis_z > 1)
+            terminated = False
             truncated = False
         else:
             # Training mode: Reset on fall or at 1000 steps
