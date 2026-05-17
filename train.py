@@ -189,8 +189,8 @@ def main():
     )
 
     print("[INFO] Saving final model...")
-    final_model_path = os.path.join(models_dir, f"g1_final_{total_timesteps}")
-    stats_path = os.path.join(models_dir, f"g1_vecnormalize_{total_timesteps}.pkl")
+    final_model_path = os.path.join(models_dir, f"g1_final_{total_timesteps}_{run.id}")
+    stats_path = os.path.join(models_dir, f"g1_vecnormalize_{total_timesteps}_{run.id}.pkl")
 
     model.save(final_model_path)
     env.save(stats_path)
