@@ -92,20 +92,18 @@ class G1Env(gym.Env):
             [0.2, 0.2], [-0.2, -0.2], [0, 0], [1.28, 1.28], [0, 0], [0, 0], [0, 0]])
 
 
-        # # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
-        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
+        # in the xml for the keyframe named "crouch" the robot is in a crouching position which we will use as our nominal pose to scale our actions around
+        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")
         # # in the xml for the keyframe named "step" the robot is in the initial step position
         # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "step")
         # # in the xml for the keyframe named "stand" the robot is in a standing position
         # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "stand")
-        # in the xml for the keyframe named "half_step" the robot is in the middle of taking a step
-        key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "half_step")
+        # # in the xml for the keyframe named "half_step" the robot is in the middle of taking a step
+        # key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "half_step")
 
         # this line extracts the joint positions from the keyframe and stores them as the nominal_qpos.
         # NOTE: we slice [7:] to skip the x,y,z positions and quaternion of the floating base
         self.nominal_qpos = self.model.key_qpos[key_id]
-
-        self.crouch_qpos = self.model.key_qpos[mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, "crouch")]
         
         # retrieving the ID for the pelvis body (used for applying random pushes in the step function)
         self.pelvis_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, 'pelvis')
@@ -196,6 +194,7 @@ class G1Env(gym.Env):
         #     # NOTE: the force needs to act in the opposite direction from the direction you want the pelvis to swing (when the left foot is swinging, the pelvis needs to move right so the force should act left)
         #     # NOTE: a positive force corresponds to a force left
         # self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/50)) * (1 - (self.total_steps / cutoff_timestep)))
+        # self.data.xfrc_applied[self.pelvis_id, 1] = 10 * (np.cos((2*np.pi) * (self.total_steps/80)) * (1 - (self.total_steps / cutoff_timestep)))
 
         # # calculate the angular position (pitch) of where the thighs should be at the current timestep for a walking gait
         # left_thigh_angle = 30*np.cos(2*np.pi*(self.total_steps/80))
@@ -249,15 +248,11 @@ class G1Env(gym.Env):
         # set number of timesteps per action
         num_timesteps = 25
 
-
-
-
         # --- PHYSICS LOOP ---
         # NOTE: the number set here in this loop in combination with the timestep length set in the scene.xml file determines the control frequency of the robot
             # control frequency = 1 / (length of timestep * number of timesteps per action)
             # NOTE: the higher the control frequency, the more poses the robot can exist in that are maybe not optimal but feasible for it to maintain because it can issue commands so fast
-        for _ in range(num_timesteps):
-
+        for phys_timestep in range(num_timesteps):
             
             # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
             #     # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
@@ -285,25 +280,26 @@ class G1Env(gym.Env):
             # p_limits = motor_limit_penalty(action, self.joint_lims)
             p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
             p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7])
-            p_target_pose_deviation = target_pose_deviation_penalty(self.data.qpos, self.crouch_qpos, self.total_steps)
+            p_target_pose_deviation = target_pose_deviation_penalty(self.data.qpos, self.total_steps, phys_timestep, num_timesteps)
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
 
             # reward term weights
             w_alive = 1
-            w_velocity = 1
+            # w_velocity = 1
             # w_limits = 1
-            w_action_diff = 0.05
+            w_action_diff = 0.03
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
             # w_foot_contact = 0.5
-            w_pelvis_orientation = 0.5
-            w_target_pose_deviation = 1
+            w_pelvis_orientation = 0.1
+            w_target_pose_deviation = 0.2
 
             # add to reward
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+            total_reward += w_alive*r_alive + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+            # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
 
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
@@ -367,12 +363,8 @@ class G1Env(gym.Env):
 
         # we then allow the physics engine to step forward a few times to let the robot settle into the new pose after reset before we start returning observations and rewards to the agent. 
         # This is important because right after reset the robot might be in an unstable state and we dont want to penalize the agent for that or return observations that are not representative of the state it will actually be in when it starts taking actions.
-        for _ in range(125):
-            
-            # apply the kicking force to begin the walking motion
-            self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
-            self.data.xfrc_applied[self.pelvis_id, 0] = 20
-            
+        for _ in range(25):
+                        
             mujoco.mj_step(self.model, self.data)
             
         return self._get_obs(), {}
@@ -443,6 +435,31 @@ def pelvis_orientation_penalty(pelvis_orientation, target_orientation = np.array
 
     return pelvis_orientation_penalty
 
+# def target_pose_deviation_penalty(qpos, target_qpos, total_steps):
+
+#     # calculate the deviation of the current pose from the nominal pose
+#     pose_deviation = np.sum(np.abs(qpos - target_qpos))
+
+#     return -pose_deviation
+
+def target_pose_deviation_penalty(qpos, total_timestep, curr_physics_timestep, tot_num_phys_timesteps):
+
+    # Pelvis position target equation logic
+        # because we switched to the force replacement logic and because of the way the axis are defined, the force acts in the direction we want the object to move (displacement between timesteps) a quarter period later since we modelled the systme as a pendulum with a restoring force
+        # this means that the force is phase shifted by a quarter period with the velocity (the velocity lags the force by a quarter period (v_phase_shift = -tau/4) assuming sinusoid equation in sin(2pi*(x+phase_shift)) )
+        # however, because we know from the motion of a pendulum that the velocity is phase shifted with the position by another quarter period
+        # so, the force is phase shifted a half period with the position (x_phase_shift = -tau/2)
+        # in other words, the force acts in the direction opposite to the direction of the displacement from equilibrium (not displacement between timesteps)
+    # 
+    pelvis_target = 0.06 * (-np.cos((2*np.pi) * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80)))
+    left_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80))
+    right_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 40)/80))
+    left_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80)))
+    right_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 40)/80)))
+
+    return - ((abs(qpos[1] - pelvis_target)/0.12) + (abs(qpos[7] - left_thigh_target)/60) + (abs(qpos[13] - right_thigh_target)/60) + (abs(qpos[10] - left_knee_target)/100) + (abs(qpos[16] - right_knee_target)/100))
+
+
 
 # def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
 
@@ -461,13 +478,6 @@ def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right
     right_foot_reward = right_foot_height *(1-both_feet_off_ground)
 
     return left_foot_reward + right_foot_reward
-
-def target_pose_deviation_penalty(qpos, target_qpos, total_steps):
-
-    # calculate the deviation of the current pose from the nominal pose
-    pose_deviation = np.sum(np.abs(qpos - target_qpos))
-
-    return -pose_deviation
 
 def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=50.0):
 
