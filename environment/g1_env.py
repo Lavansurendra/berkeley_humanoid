@@ -123,49 +123,49 @@ class G1Env(gym.Env):
         # define a scaling factor which will be used to determine the range of values surrounding the nominal pose that the action given by the policy (and clipped by the spaces.Box) will be scaled to.
         self.action_scaling_factor = 0.9
 
-        # initialize variables for the bounds of the action scaling ranges such that the position targets are never set to a position that is outside the ranges of the value in this vector away from the nominal position of the joint
-            # NOTE: these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators as we are assuming that the action outputted by the policy for these joints is a correction to the target position for a walking gait
-        self.npos_delta_lower = np.zeros(self.num_actions)
-        self.npos_delta_upper = np.zeros(self.num_actions)
+        # # initialize variables for the bounds of the action scaling ranges such that the position targets are never set to a position that is outside the ranges of the value in this vector away from the nominal position of the joint
+        #     # NOTE: these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators as we are assuming that the action outputted by the policy for these joints is a correction to the target position for a walking gait
+        # self.npos_delta_lower = np.zeros(self.num_actions)
+        # self.npos_delta_upper = np.zeros(self.num_actions)
 
-        # define bounds for the action scaling range for all the joints that they will apply to
-            # NOTE: since these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators, we allow the values for those actuators to remain as 0
-        self.npos_delta_lower[1:3] = np.abs(self.joint_lims[1:3,0] - self.nominal_qpos[8:10]) * self.action_scaling_factor # left hip roll and yaw joints
-        self.npos_delta_lower[4:6] = np.abs(self.joint_lims[4:6,0] - self.nominal_qpos[11:13]) * self.action_scaling_factor # left ankle pitch and roll joints
-        self.npos_delta_lower[7:9] = np.abs(self.joint_lims[7:9,0] - self.nominal_qpos[14:16]) * self.action_scaling_factor # right hip roll and yaw joint
-        self.npos_delta_lower[10:] = np.abs(self.joint_lims[10:,0] - self.nominal_qpos[17:]) * self.action_scaling_factor # right ankle joints, waist joints and arm joint
+        # # define bounds for the action scaling range for all the joints that they will apply to
+        #     # NOTE: since these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators, we allow the values for those actuators to remain as 0
+        # self.npos_delta_lower[1:3] = np.abs(self.joint_lims[1:3,0] - self.nominal_qpos[8:10]) * self.action_scaling_factor # left hip roll and yaw joints
+        # self.npos_delta_lower[4:6] = np.abs(self.joint_lims[4:6,0] - self.nominal_qpos[11:13]) * self.action_scaling_factor # left ankle pitch and roll joints
+        # self.npos_delta_lower[7:9] = np.abs(self.joint_lims[7:9,0] - self.nominal_qpos[14:16]) * self.action_scaling_factor # right hip roll and yaw joint
+        # self.npos_delta_lower[10:] = np.abs(self.joint_lims[10:,0] - self.nominal_qpos[17:]) * self.action_scaling_factor # right ankle joints, waist joints and arm joint
 
-        self.npos_delta_upper[1:3] = np.abs(self.joint_lims[1:3,1] - self.nominal_qpos[8:10]) * self.action_scaling_factor # left hip roll and yaw joints
-        self.npos_delta_upper[4:6] = np.abs(self.joint_lims[4:6,1] - self.nominal_qpos[11:13]) * self.action_scaling_factor # left ankle pitch and roll joints
-        self.npos_delta_upper[7:9] = np.abs(self.joint_lims[7:9,1] - self.nominal_qpos[14:16]) * self.action_scaling_factor # right hip roll and yaw joint
-        self.npos_delta_upper[10:] = np.abs(self.joint_lims[10:,1] - self.nominal_qpos[17:]) * self.action_scaling_factor # right ankle joints, waist joints and arm joint
-
-
-
-        # # define bounds for the action scaling range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
-        # self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.action_scaling_factor
-        # self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.action_scaling_factor 
+        # self.npos_delta_upper[1:3] = np.abs(self.joint_lims[1:3,1] - self.nominal_qpos[8:10]) * self.action_scaling_factor # left hip roll and yaw joints
+        # self.npos_delta_upper[4:6] = np.abs(self.joint_lims[4:6,1] - self.nominal_qpos[11:13]) * self.action_scaling_factor # left ankle pitch and roll joints
+        # self.npos_delta_upper[7:9] = np.abs(self.joint_lims[7:9,1] - self.nominal_qpos[14:16]) * self.action_scaling_factor # right hip roll and yaw joint
+        # self.npos_delta_upper[10:] = np.abs(self.joint_lims[10:,1] - self.nominal_qpos[17:]) * self.action_scaling_factor # right ankle joints, waist joints and arm joint
 
 
-        # initialize variables for the upper and lower bounds of the action scaling range
-        self.npos_upper = np.zeros(self.num_actions)
-        self.npos_lower = np.zeros(self.num_actions)
 
-        # define the values of the upper and lower bounds of the action scaling range for all the joints that they will apply to by adding and subtracting the corresponding npos_delta value from the nominal position of the joint
-            # NOTE: since these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators, we allow the values for those actuators to remain as 0
-        self.npos_upper[1:3] = self.nominal_qpos[8:10] + self.npos_delta_upper[1:3] # left hip roll and yaw joints
-        self.npos_upper[4:6] = self.nominal_qpos[11:13] + self.npos_delta_upper[4:6] # left ankle pitch and roll joints
-        self.npos_upper[7:9] = self.nominal_qpos[14:16] + self.npos_delta_upper[7:9] # right hip roll and yaw joints
-        self.npos_upper[10:] = self.nominal_qpos[17:] + self.npos_delta_upper[10:] # right ankle joints, waist joints and arm joints
+        # define bounds for the action scaling range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
+        self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.action_scaling_factor
+        self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.action_scaling_factor 
+
+
+        # # initialize variables for the upper and lower bounds of the action scaling range
+        # self.npos_upper = np.zeros(self.num_actions)
+        # self.npos_lower = np.zeros(self.num_actions)
+
+        # # define the values of the upper and lower bounds of the action scaling range for all the joints that they will apply to by adding and subtracting the corresponding npos_delta value from the nominal position of the joint
+        #     # NOTE: since these bounds will not be used for the actions corresponding to the hip pitch actuators and the knee pitch actuators, we allow the values for those actuators to remain as 0
+        # self.npos_upper[1:3] = self.nominal_qpos[8:10] + self.npos_delta_upper[1:3] # left hip roll and yaw joints
+        # self.npos_upper[4:6] = self.nominal_qpos[11:13] + self.npos_delta_upper[4:6] # left ankle pitch and roll joints
+        # self.npos_upper[7:9] = self.nominal_qpos[14:16] + self.npos_delta_upper[7:9] # right hip roll and yaw joints
+        # self.npos_upper[10:] = self.nominal_qpos[17:] + self.npos_delta_upper[10:] # right ankle joints, waist joints and arm joints
 
         
-        self.npos_lower[1:3] = self.nominal_qpos[8:10] - self.npos_delta_lower[1:3] # left hip roll and yaw joints
-        self.npos_lower[4:6] = self.nominal_qpos[11:13] - self.npos_delta_lower[4:6] # left ankle pitch and roll joints
-        self.npos_lower[7:9] = self.nominal_qpos[14:16] - self.npos_delta_lower[7:9] # right hip roll and yaw joints
-        self.npos_lower[10:] = self.nominal_qpos[17:] - self.npos_delta_lower[10:] # right ankle joints, waist joints and arm joints
+        # self.npos_lower[1:3] = self.nominal_qpos[8:10] - self.npos_delta_lower[1:3] # left hip roll and yaw joints
+        # self.npos_lower[4:6] = self.nominal_qpos[11:13] - self.npos_delta_lower[4:6] # left ankle pitch and roll joints
+        # self.npos_lower[7:9] = self.nominal_qpos[14:16] - self.npos_delta_lower[7:9] # right hip roll and yaw joints
+        # self.npos_lower[10:] = self.nominal_qpos[17:] - self.npos_delta_lower[10:] # right ankle joints, waist joints and arm joints
 
-        # self.npos_upper = self.nominal_qpos[7:] + self.npos_delta_upper
-        # self.npos_lower = self.nominal_qpos[7:] - self.npos_delta_lower
+        self.npos_upper = self.nominal_qpos[7:] + self.npos_delta_upper
+        self.npos_lower = self.nominal_qpos[7:] - self.npos_delta_lower
 
         self.render_mode = render_mode
         if self.render_mode == "human":
@@ -269,22 +269,28 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
 
-
-        # initialize a vector to contain the scaled action values that will be combinded with the target positions for the 4 actuators above to create a final vector of target positions for all actuators
-        scaled_action = np.zeros_like(action)
-
-        # scale the action outputted by the policy corresponding to the pitch actuators of the thighs and knees (which is clipped by the spaces.Box line above) to surround the value 0 within a prespecified range (-0.1, 0.1)
-            # NOTE: these 4 actions specifically will be the actions outputted by the policy as corrections to the target positions for the pitch motors of the thighs and knees for a walking gait
-        scaled_action[0] = action[0] * min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
-        scaled_action[3] = action[3] * min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
-        scaled_action[6] = action[6] * min((self.total_steps / cutoff_timestep),1) # right hip pitch joint
-        scaled_action[9] = action[9] * min((self.total_steps / cutoff_timestep),1) # right knee pitch joint
-
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
-        scaled_action[1:3] = self.nominal_qpos[8:10] + action[1:3] * (self.npos_upper[1:3] - self.npos_lower[1:3]) / (self.box_high - self.box_low) # left hip roll and yaw joints
-        scaled_action[4:6] = self.nominal_qpos[11:13] + action[4:6] * (self.npos_upper[4:6] - self.npos_lower[4:6]) / (self.box_high - self.box_low) # left ankle pitch and roll joints
-        scaled_action[7:9] = self.nominal_qpos[14:16] + action[7:9] * (self.npos_upper[7:9] - self.npos_lower[7:9]) / (self.box_high - self.box_low) # right hip roll and yaw joints
-        scaled_action[10:] = self.nominal_qpos[17:] + action[10:] * (self.npos_upper[10:] - self.npos_lower[10:]) / (self.box_high - self.box_low) # right ankle joints, waist joints and arm joints
+        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) # left hip roll and yaw joints
+        scaled_action[0] *= min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
+        scaled_action[3] *= min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
+        scaled_action[6] *= min((self.total_steps / cutoff_timestep),1) # right hip pitch joint
+        scaled_action[9] *= min((self.total_steps / cutoff_timestep),1) # right knee pitch joint
+    
+        # # initialize a vector to contain the scaled action values that will be combinded with the target positions for the 4 actuators above to create a final vector of target positions for all actuators
+        # scaled_action = np.zeros_like(action)
+
+        # # scale the action outputted by the policy corresponding to the pitch actuators of the thighs and knees (which is clipped by the spaces.Box line above) to surround the value 0 within a prespecified range (-0.1, 0.1)
+        #     # NOTE: these 4 actions specifically will be the actions outputted by the policy as corrections to the target positions for the pitch motors of the thighs and knees for a walking gait
+        # scaled_action[0] = action[0] * min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
+        # scaled_action[3] = action[3] * min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
+        # scaled_action[6] = action[6] * min((self.total_steps / cutoff_timestep),1) # right hip pitch joint
+        # scaled_action[9] = action[9] * min((self.total_steps / cutoff_timestep),1) # right knee pitch joint
+
+        # # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
+        # scaled_action[1:3] = self.nominal_qpos[8:10] + action[1:3] * (self.npos_upper[1:3] - self.npos_lower[1:3]) / (self.box_high - self.box_low) # left hip roll and yaw joints
+        # scaled_action[4:6] = self.nominal_qpos[11:13] + action[4:6] * (self.npos_upper[4:6] - self.npos_lower[4:6]) / (self.box_high - self.box_low) # left ankle pitch and roll joints
+        # scaled_action[7:9] = self.nominal_qpos[14:16] + action[7:9] * (self.npos_upper[7:9] - self.npos_lower[7:9]) / (self.box_high - self.box_low) # right hip roll and yaw joints
+        # scaled_action[10:] = self.nominal_qpos[17:] + action[10:] * (self.npos_upper[10:] - self.npos_lower[10:]) / (self.box_high - self.box_low) # right ankle joints, waist joints and arm joints
 
         # # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         # scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
@@ -301,6 +307,9 @@ class G1Env(gym.Env):
             # NOTE: the higher the control frequency, the more poses the robot can exist in that are maybe not optimal but feasible for it to maintain because it can issue commands so fast
         for phys_timestep in range(num_timesteps):
             
+            # initialize a variable to hodl the new action
+            new_scaled_action = scaled_action.copy()
+
             # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
             left_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps)/160)))
             right_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps- 80)/160)))
@@ -308,10 +317,10 @@ class G1Env(gym.Env):
             right_knee_target = np.deg2rad(50 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 80)/160))))
 
             # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
-            scaled_action[0] += left_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-            scaled_action[3] += left_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-            scaled_action[6] += right_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-            scaled_action[9] += right_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
+            new_scaled_action[0] += left_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
+            new_scaled_action[3] += left_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
+            new_scaled_action[6] += right_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
+            new_scaled_action[9] += right_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
 
             # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
             #     # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
@@ -353,7 +362,7 @@ class G1Env(gym.Env):
             # add to reward
             total_reward += w_alive*r_alive + + w_velocity*r_forward + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation            
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
-            self.data.ctrl[:] = scaled_action
+            self.data.ctrl[:] = new_scaled_action
 
             # 6. Step physics
             mujoco.mj_step(self.model, self.data)
