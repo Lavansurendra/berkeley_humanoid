@@ -215,7 +215,7 @@ class G1Env(gym.Env):
         # # ------------ Cyclical Thigh Pushing Logic -----------------
         # # set the cutoff timestep
         #     # TODO: change this from being hardcoded to being a parameter
-        # cutoff_timestep = 5000
+        cutoff_timestep = 5000
         
         # # clear the force applied on each thigh and the pelvis from the previous step
         # self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
@@ -269,21 +269,16 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
 
-        # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
-        left_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count)/80)))
-        right_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count - 40)/80)))
-        left_knee_target = np.deg2rad(50 * max(0, np.sin(2*np.pi * ((self.step_count)/80))))
-        right_knee_target = np.deg2rad(50 * max(0, np.sin(2*np.pi * ((self.step_count - 40)/80))))
 
         # initialize a vector to contain the scaled action values that will be combinded with the target positions for the 4 actuators above to create a final vector of target positions for all actuators
         scaled_action = np.zeros_like(action)
 
         # scale the action outputted by the policy corresponding to the pitch actuators of the thighs and knees (which is clipped by the spaces.Box line above) to surround the value 0 within a prespecified range (-0.1, 0.1)
             # NOTE: these 4 actions specifically will be the actions outputted by the policy as corrections to the target positions for the pitch motors of the thighs and knees for a walking gait
-        scaled_action[0] = action[0] * 0.1 # left hip pitch joint
-        scaled_action[3] = action[3] * 0.1 # left knee pitch joint
-        scaled_action[6] = action[6] * 0.1 # right hip pitch joint
-        scaled_action[9] = action[9] * 0.1 # right knee pitch joint
+        scaled_action[0] = action[0] * np.min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
+        scaled_action[3] = action[3] * np.min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
+        scaled_action[6] = action[6] * np.min((self.total_steps / cutoff_timestep),1) # right hip pitch joint
+        scaled_action[9] = action[9] * np.min((self.total_steps / cutoff_timestep),1) # right knee pitch joint
 
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action[1:3] = self.nominal_qpos[8:10] + action[1:3] * (self.npos_upper[1:3] - self.npos_lower[1:3]) / (self.box_high - self.box_low) # left hip roll and yaw joints
@@ -293,12 +288,6 @@ class G1Env(gym.Env):
 
         # # scale the action outputted by the policy (which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         # scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low)
-
-        # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
-        scaled_action[0] += left_thigh_target
-        scaled_action[3] += left_knee_target
-        scaled_action[6] += right_thigh_target
-        scaled_action[9] += right_knee_target
 
         # initialize reward value
         total_reward = 0.0
@@ -312,6 +301,18 @@ class G1Env(gym.Env):
             # NOTE: the higher the control frequency, the more poses the robot can exist in that are maybe not optimal but feasible for it to maintain because it can issue commands so fast
         for phys_timestep in range(num_timesteps):
             
+            # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
+            left_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps)/160)))
+            right_thigh_target = np.deg2rad(30*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps- 80)/160)))
+            left_knee_target = np.deg2rad(50 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps)/160))))
+            right_knee_target = np.deg2rad(50 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 80)/160))))
+
+            # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
+            scaled_action[0] += left_thigh_target * (1 - np.min((self.total_steps / cutoff_timestep), 1))
+            scaled_action[3] += left_knee_target * (1 - np.min((self.total_steps / cutoff_timestep), 1))
+            scaled_action[6] += right_thigh_target * (1 - np.min((self.total_steps / cutoff_timestep), 1))
+            scaled_action[9] += right_knee_target * (1 - np.min((self.total_steps / cutoff_timestep), 1))
+
             # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
             #     # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
             #     # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
@@ -515,11 +516,11 @@ def target_pose_deviation_penalty(qpos, total_timestep, curr_physics_timestep, t
         # so, the force is phase shifted a half period with the position (x_phase_shift = -tau/2)
         # in other words, the force acts in the direction opposite to the direction of the displacement from equilibrium (not displacement between timesteps)
     # 
-    pelvis_target = 0.06 * (-np.cos((2*np.pi) * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80)))
-    left_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80))
-    right_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 40)/80))
-    left_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80)))
-    right_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 40)/80)))
+    pelvis_target = 0.06 * (-np.cos((2*np.pi) * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/160)))
+    left_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/160))
+    right_thigh_target = 30*np.cos(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 80)/160))
+    left_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/160)))
+    right_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 80)/160)))
 
     return - ((abs(qpos[1] - pelvis_target)/0.12) + (abs(qpos[7] - left_thigh_target)/60) + (abs(qpos[13] - right_thigh_target)/60) + (abs(qpos[10] - left_knee_target)/100) + (abs(qpos[16] - right_knee_target)/100))
 
