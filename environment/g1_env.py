@@ -215,7 +215,7 @@ class G1Env(gym.Env):
         # # ------------ Cyclical Thigh Pushing Logic -----------------
         # # set the cutoff timestep
         #     # TODO: change this from being hardcoded to being a parameter
-        cutoff_timestep = 5000
+        cutoff_timestep = 15000
         
         # # clear the force applied on each thigh and the pelvis from the previous step
         # self.data.qfrc_applied[6] = 0.0 # left hip pitch joint
@@ -268,6 +268,10 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
+
+        # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
+        # self.data.xfrc_applied[self.pelvis_id, 2] = 0.0
+        # self.data.xfrc_applied[self.pelvis_id, 2] = 350 * (1 - (self.total_steps / cutoff_timestep))
 
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) # left hip roll and yaw joints
@@ -360,7 +364,7 @@ class G1Env(gym.Env):
             w_target_pose_deviation = 0.3
 
             # add to reward
-            total_reward += w_alive*r_alive + + w_velocity*r_forward + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation            
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation            
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = new_scaled_action
 
