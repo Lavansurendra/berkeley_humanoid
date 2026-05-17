@@ -278,7 +278,7 @@ class G1Env(gym.Env):
             
             # calculate penatly terms
             # p_limits = motor_limit_penalty(action, self.joint_lims)
-            p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
+            # p_action_diff = action_diff_penalty(scaled_action, self.previous_action)
             p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7])
             p_target_pose_deviation = target_pose_deviation_penalty(self.data.qpos, self.total_steps, phys_timestep, num_timesteps)
             # px_velocity = velocity_tracking_reward(self.data.qvel[0]) # x velocity of the pelvis is at index 0 of the qvel vector
@@ -287,7 +287,7 @@ class G1Env(gym.Env):
             w_alive = 1
             # w_velocity = 1
             # w_limits = 1
-            w_action_diff = 0.03
+            # w_action_diff = 0.03
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
             # w_foot_contact = 0.5
@@ -298,7 +298,8 @@ class G1Env(gym.Env):
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
-            total_reward += w_alive*r_alive + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+            total_reward += w_alive*r_alive + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+            # total_reward += w_alive*r_alive + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
 
             
