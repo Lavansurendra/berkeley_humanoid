@@ -285,9 +285,9 @@ class G1Env(gym.Env):
 
             # reward term weights
             w_alive = 1
-            # w_velocity = 1
+            w_velocity = 0.1
             # w_limits = 1
-            # w_action_diff = 0.03
+            # w_action_diff = 0.1
             # w_foot_lift = 0.5
             # w_foot_target = 0.5
             # w_foot_contact = 0.5
@@ -298,7 +298,8 @@ class G1Env(gym.Env):
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_foot_contact*r_foot_contact + w_pelvis_orientation*p_pelvis_orientation
-            total_reward += w_alive*r_alive + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
+            total_reward += w_alive*r_alive + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation + w_velocity*r_forward
+            # total_reward += w_alive*r_alive + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
             # total_reward += w_alive*r_alive + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
             # total_reward += w_alive*r_alive + w_velocity*r_forward + w_action_diff*p_action_diff + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation
 
