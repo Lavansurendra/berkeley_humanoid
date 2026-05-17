@@ -233,9 +233,9 @@ class G1Env(gym.Env):
 
 
         # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
-        # self.data.xfrc_applied[self.pelvis_id, 2] = 0.0
-        # self.data.xfrc_applied[self.pelvis_id, 2] = 350 * (1 - (self.total_steps / cutoff_timestep))
-
+        self.data.xfrc_applied[self.pelvis_id, 2] = 0.0
+        self.data.xfrc_applied[self.pelvis_id, 2] = 350 * (1 - (self.total_steps / cutoff_timestep))
+         
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) # left hip roll and yaw joints
         scaled_action[0] *= min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
@@ -246,6 +246,7 @@ class G1Env(gym.Env):
         # scaled_action[3] -= self.nominal_qpos[3] # left knee pitch joint
         # scaled_action[6] -= self.nominal_qpos[6] # right hip pitch joint
         # scaled_action[9] -= self.nominal_qpos[9] # right knee pitch joint
+
     
         # initialize reward value
         total_reward = 0.0
