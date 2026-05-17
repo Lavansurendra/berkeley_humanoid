@@ -521,8 +521,6 @@ def target_pose_deviation_penalty(qpos, total_timestep, curr_physics_timestep, t
     left_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps))/80)))
     right_knee_target = 50 * max(0, np.sin(2*np.pi * ((total_timestep + (curr_physics_timestep/tot_num_phys_timesteps) - 40)/80)))
 
-    print(left_knee_target)
-
     return - ((abs(qpos[1] - pelvis_target)/0.12) + (abs(qpos[7] - left_thigh_target)/60) + (abs(qpos[13] - right_thigh_target)/60) + (abs(qpos[10] - left_knee_target)/100) + (abs(qpos[16] - right_knee_target)/100))
 
 
