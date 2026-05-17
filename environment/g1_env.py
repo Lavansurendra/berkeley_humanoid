@@ -246,7 +246,6 @@ class G1Env(gym.Env):
         # scaled_action[3] -= self.nominal_qpos[3] # left knee pitch joint
         # scaled_action[6] -= self.nominal_qpos[6] # right hip pitch joint
         # scaled_action[9] -= self.nominal_qpos[9] # right knee pitch joint
-
     
         # initialize reward value
         total_reward = 0.0
@@ -318,12 +317,8 @@ class G1Env(gym.Env):
             # w_target_pose_deviation = 0.3
 
             # add to reward
-<<<<<<< HEAD
-            total_reward += w_alive*r_alive + w_velocity*r_forward + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_target_pose_deviation*p_target_pose_deviation            
-=======
             total_reward += w_alive*r_alive + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation
             
->>>>>>> bdcf53caa34036eb9646bd3f150400fda18a2334
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = new_scaled_action
 
