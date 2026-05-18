@@ -242,6 +242,9 @@ class G1Env(gym.Env):
             # self.data.xfrc_applied[self.pelvis_id, 1] = -50 * self.data.qpos[1] * (1 - (self.total_steps / cutoff_timestep))
             # self.data.xfrc_applied[self.pelvis_id, 2] = 50 * (1 - (self.total_steps / cutoff_timestep))
             self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) * (1 - (self.total_steps / cutoff_timestep))
+
+            # apply a positive force in the x direction to force the robot to move forward and maintain it's balance
+            self.data.xfrc_applied[self.pelvis_id, 0] = 20
             
             # scaled_action[0] *= min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
             # scaled_action[3] *= min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
