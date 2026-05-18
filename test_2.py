@@ -25,6 +25,14 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
         data.ctrl[:] = nominal_ctrl
 
+        data.xfrc_applied[0, 1] = 0.0
+        data.xfrc_applied[0, 2] = 0.0
+        data.xfrc_applied[0, 4] = 0.0
+        data.xfrc_applied[0, 1] = -50 * data.qpos[1] * (1 - (data.time / 15))
+        data.xfrc_applied[0, 2] = 350 * (1 - (data.time / 15))
+        data.xfrc_applied[0, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), data.qpos[3:7])) * (1 - (data.time / 15))
+
+
         # ------------ Cyclical Thigh Position Logic -----------------
         left_thigh_angle_deg = 30 * np.cos(2 * np.pi * (data.time / 4))
         right_thigh_angle_deg = 30 * np.cos(2 * np.pi * ((data.time - 2) / 4))
