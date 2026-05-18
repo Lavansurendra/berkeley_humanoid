@@ -14,10 +14,10 @@ def main():
     
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "g1_final_3160000"
+    model_name = "g1_final_400000"
     
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "g1_vecnormalize_3160000.pkl")
+    stats_path = os.path.join(models_dir, "g1_vecnormalize_400000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
