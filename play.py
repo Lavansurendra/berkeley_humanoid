@@ -49,14 +49,16 @@ def main():
     dt = raw_env.model.opt.timestep * 10 
     
     while True:
-        start_time = time.time() 
+        # start_time = time.time() 
         
         action, _states = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
 
-        compute_time = time.time() - start_time
-        if compute_time < dt:
-            time.sleep(dt - compute_time)
+        time.sleep(0.05)
+
+        # compute_time = time.time() - start_time
+        # if compute_time < dt:
+        #     time.sleep(dt - compute_time)
 
 if __name__ == "__main__":
     main()
