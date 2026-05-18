@@ -295,10 +295,6 @@ class G1Env(gym.Env):
                 right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * (((self.step_count - 40) + phys_timestep/num_timesteps - 20)/40))) + 5)
 
                 # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
-                # new_scaled_action[0] += left_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-                # new_scaled_action[3] += left_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-                # new_scaled_action[6] += right_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
-                # new_scaled_action[9] += right_knee_target * (1 - min((self.total_steps / cutoff_timestep), 1))
                 new_scaled_action[0] += left_thigh_target
                 new_scaled_action[3] += left_knee_target
                 new_scaled_action[6] += right_thigh_target
