@@ -242,9 +242,9 @@ class G1Env(gym.Env):
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * correction_scaling
         
         # adding a spike push on the pelvis at the initial time which decays overtime 
-        if 40 <= self.step_count <= 60:
+        if 60 <= self.step_count <= 70:
             self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
-            self.data.xfrc_applied[self.pelvis_id, 0] = 20 * np.sin(2*np.pi * ((self.step_count - 40)/40))
+            self.data.xfrc_applied[self.pelvis_id, 0] = 20 * np.sin(2*np.pi * ((self.step_count - 60)/20))
 
         elif self.step_count > 60:
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
@@ -253,7 +253,7 @@ class G1Env(gym.Env):
             self.data.xfrc_applied[self.pelvis_id, 4] = 0.0
             # self.data.xfrc_applied[self.pelvis_id, 1] = -50 * self.data.qpos[1] * (1 - (self.total_steps / cutoff_timestep))
             # self.data.xfrc_applied[self.pelvis_id, 2] = 50 * (1 - (self.total_steps / cutoff_timestep))
-            self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) # * (1 - (self.total_steps / cutoff_timestep))
+            # self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) # * (1 - (self.total_steps / cutoff_timestep))
 
             # apply a positive force in the x direction to force the robot to move forward and maintain it's balance
             self.data.xfrc_applied[self.pelvis_id, 0] = 20
