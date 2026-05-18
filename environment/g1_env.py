@@ -232,8 +232,8 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
         # define a vector to contain the factors by which corrections will be applied to each actuator
-        correction_scaling = np.array([0.15, 0, 0.05, 0.15, 0.1, 0.01,
-                                       0.15, 0, 0.05, 0.15, 0.1, 0.01,
+        correction_scaling = np.array([0.15, 0, 0.05, 0.15, 0.2, 0.01,
+                                       0.15, 0, 0.05, 0.15, 0.2, 0.01,
                                        0, 0, 0,
                                        0, 0, 0, 0, 0, 0, 0,
                                        0, 0, 0, 0, 0, 0, 0])
@@ -242,18 +242,18 @@ class G1Env(gym.Env):
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * correction_scaling
         
         # adding a spike push on the pelvis at the initial time which decays overtime 
-        if 60 <= self.step_count <= 70:
+        if 40 <= self.step_count <= 200:
             self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
-            self.data.xfrc_applied[self.pelvis_id, 0] = 20 * np.sin(2*np.pi * ((self.step_count - 60)/20))
+            self.data.xfrc_applied[self.pelvis_id, 0] = 20 * np.sin(2*np.pi * ((self.step_count - 40)/320))
 
-        elif self.step_count > 60:
+        if self.step_count > 40:
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
             self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
             self.data.xfrc_applied[self.pelvis_id, 2] = 0.0
             self.data.xfrc_applied[self.pelvis_id, 4] = 0.0
             # self.data.xfrc_applied[self.pelvis_id, 1] = -50 * self.data.qpos[1] * (1 - (self.total_steps / cutoff_timestep))
             # self.data.xfrc_applied[self.pelvis_id, 2] = 50 * (1 - (self.total_steps / cutoff_timestep))
-            # self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) # * (1 - (self.total_steps / cutoff_timestep))
+            self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) # * (1 - (self.total_steps / cutoff_timestep))
 
             # apply a positive force in the x direction to force the robot to move forward and maintain it's balance
             self.data.xfrc_applied[self.pelvis_id, 0] = 20
@@ -283,13 +283,16 @@ class G1Env(gym.Env):
             # initialize a variable to hodl the new action
             new_scaled_action = scaled_action.copy()
 
+            # initialize a variable to hold the forward velocity reward
+            r_forward = 0
+
             if self.step_count > 40:
 
                 # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
-                left_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 60)/40)))
-                right_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 60)/40)))
-                left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 60)/40))))
-                right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 60)/40))))
+                left_thigh_target = np.deg2rad(15*np.cos(2*np.pi * (((self.step_count - 40) + phys_timestep/num_timesteps)/40)) - 10)
+                right_thigh_target = np.deg2rad(15*np.cos(2*np.pi * (((self.step_count - 40) + phys_timestep/num_timesteps - 20)/40)) - 10)
+                left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * (((self.step_count - 40) + phys_timestep/num_timesteps)/40))) + 5)
+                right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * (((self.step_count - 40) + phys_timestep/num_timesteps - 20)/40))) + 5)
 
                 # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
                 # new_scaled_action[0] += left_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
@@ -300,6 +303,9 @@ class G1Env(gym.Env):
                 new_scaled_action[3] += left_knee_target
                 new_scaled_action[6] += right_thigh_target
                 new_scaled_action[9] += right_knee_target
+
+                r_forward = forward_motion_reward(self.data.qvel[0])
+
 
 
             # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
@@ -315,7 +321,6 @@ class G1Env(gym.Env):
 
             # calculate reward terms
             r_alive = alive_reward(self.data.qpos[2])
-            # r_forward = forward_motion_reward(self.data.qvel[0])
             # # calculate foot lift reward proportional to height of foot above floor
             # r_foot_lift = foot_lift_reward(left_foot_height, right_foot_height)
             # # calculate foot target penalty for keeping feet on the ground or lifting them too high
@@ -340,7 +345,7 @@ class G1Env(gym.Env):
             # w_target_pose_deviation = 0.3
 
             # add to reward
-            total_reward += w_alive*r_alive + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation
+            total_reward += w_alive*r_alive + w_velocity*r_forward + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = new_scaled_action
@@ -430,24 +435,6 @@ class G1Env(gym.Env):
 
 # ======================================================= Rewards =========================================================
 
-# def motor_limit_penalty(action, joint_lims):
-
-#     '''
-#     Penalize the agent if the action is outside the joint limitations
-#     The reason we are adding this reward is because we want the learning policy to have no limitations on the action values it can output
-#     so that it can explore the full range of possible actions and find the best ones that maximize the reward however we also
-#     need it to learn that it should only output values that are actually possible for the robot to execute hence the penalty
-#     '''
-    
-#     # calculate the distance between the angular positions specified in the action vector and the lower and upper limits of the joint rangees of motion
-#     lower_lim_dist = np.abs(np.minimum(action - joint_lims[:,0], np.zeros_like(action)))
-#     upper_lim_dist = np.maximum(action - joint_lims[:,1], np.zeros_like(action))
-
-#     # calculate an offset term so that as the actions get closer to being inside the limits the penalty does not go to 0 and there is a still a penalty for being outside the limits
-#     offset = ((action <= joint_lims[:,0]) + (action >= joint_lims[:,1])).astype(int)
-
-#     return -(np.sum(lower_lim_dist) + np.sum(upper_lim_dist)) - np.sum(offset)
-
 
 def alive_reward(pelvis_height):
 
@@ -456,20 +443,16 @@ def alive_reward(pelvis_height):
     
     else:
         return - abs(pelvis_height - 0.76)
-
      
-# def action_diff_penalty(action, prev_action):
-
-#     return -np.sum(np.abs(action-prev_action))
-
 def forward_motion_reward(forward_velocity):
 
     return 1.0 * (forward_velocity > 0)
 
+def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
 
-# def forward_motion_reward(forward_velocity):
+    velocity_error = abs(forward_velocity - target_velocity)
+    return -velocity_error
 
-#     return forward_velocity
 
 def pelvis_zvel_penalty(pelvis_zvel):
 
@@ -514,12 +497,6 @@ def target_pose_deviation_penalty(qpos, total_timestep, curr_physics_timestep, t
 
     return - ((abs(qpos[1] - pelvis_target)/0.12) + (abs(qpos[7] - left_thigh_target)/60) + (abs(qpos[13] - right_thigh_target)/60) + (abs(qpos[10] - left_knee_target)/100) + (abs(qpos[16] - right_knee_target)/100))
 
-
-
-def velocity_tracking_reward(forward_velocity, target_velocity=1.0):
-
-    velocity_error = abs(forward_velocity - target_velocity)
-    return -velocity_error
 
 def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=50.0):
     
