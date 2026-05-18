@@ -232,7 +232,7 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
-        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * 0.1 # left hip roll and yaw joints
+        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * 0.5 # left hip roll and yaw joints
         
         if self.step_count > 40:
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
