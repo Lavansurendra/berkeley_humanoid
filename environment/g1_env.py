@@ -121,11 +121,11 @@ class G1Env(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_obs,), dtype=np.float32)
 
         # define a scaling factor which will be used to determine the range of values surrounding the nominal pose that the action given by the policy (and clipped by the spaces.Box) will be scaled to.
-        self.action_scaling_factor = 0.9
+        self.bound_scaling_factor = 0.9
 
         # define bounds for the action scaling range such that the position targets are never set to a position that is outside the range of the value in this vector away from the nominal position of the joint
-        self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.action_scaling_factor
-        self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.action_scaling_factor 
+        self.npos_delta_lower = np.abs(self.joint_lims[:,0] - self.nominal_qpos[7:]) * self.bound_scaling_factor
+        self.npos_delta_upper = np.abs(self.joint_lims[:,1] - self.nominal_qpos[7:]) * self.bound_scaling_factor 
 
         self.npos_upper = self.nominal_qpos[7:] + self.npos_delta_upper
         self.npos_lower = self.nominal_qpos[7:] - self.npos_delta_lower
@@ -231,8 +231,15 @@ class G1Env(gym.Env):
         # self.data.qfrc_applied[9] = left_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # left knee pitch joint
         # self.data.qfrc_applied[15] = right_knee_qfrc * (1 - (self.total_steps / cutoff_timestep)) # right knee pitch joint
 
+        # define a vector to contain the factors by which corrections will be applied to each actuator
+        correction_scaling = np.array([0.15, 0, 0.05, 0.15, 0.1, 0.01,
+                                       0.15, 0, 0.05, 0.15, 0.1, 0.01,
+                                       0, 0, 0,
+                                       0, 0, 0, 0, 0, 0, 0,
+                                       0, 0, 0, 0, 0, 0, 0])
+
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
-        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * 0.5 # left hip roll and yaw joints
+        scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * correction_scaling
         
         if self.step_count > 40:
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
