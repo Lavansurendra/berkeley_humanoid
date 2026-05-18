@@ -241,7 +241,12 @@ class G1Env(gym.Env):
         # scale the action outputted by the policy for the remained of the actuators(which is clipped by the spaces.Box line above) to surround the nominal position of each of the joints within a prespecified range (self.npos_delta)
         scaled_action = self.nominal_qpos[7:] + action * (self.npos_upper - self.npos_lower) / (self.box_high - self.box_low) * correction_scaling
         
-        if self.step_count > 40:
+        # adding a spike push on the pelvis at the initial time which decays overtime 
+        if 40 <= self.step_count <= 60:
+            self.data.xfrc_applied[self.pelvis_id, 0] = 0.0
+            self.data.xfrc_applied[self.pelvis_id, 0] = 20 * np.sin(2*np.pi * ((self.step_count - 40)/40))
+
+        elif self.step_count > 60:
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
             self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
             self.data.xfrc_applied[self.pelvis_id, 2] = 0.0
@@ -281,10 +286,10 @@ class G1Env(gym.Env):
             if self.step_count > 40:
 
                 # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
-                left_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 40)/40)))
-                right_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 40)/40)))
-                left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 40)/40))))
-                right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 40)/40))))
+                left_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 60)/40)))
+                right_thigh_target = np.deg2rad(10*np.cos(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 60)/40)))
+                left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 60)/40))))
+                right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((self.step_count + phys_timestep/num_timesteps - 20 - 60)/40))))
 
                 # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
                 # new_scaled_action[0] += left_thigh_target * (1 - min((self.total_steps / cutoff_timestep), 1))
