@@ -241,16 +241,16 @@ class G1Env(gym.Env):
             self.data.xfrc_applied[self.pelvis_id, 4] = 0.0
             # self.data.xfrc_applied[self.pelvis_id, 1] = -50 * self.data.qpos[1] * (1 - (self.total_steps / cutoff_timestep))
             # self.data.xfrc_applied[self.pelvis_id, 2] = 50 * (1 - (self.total_steps / cutoff_timestep))
-            # self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) * (1 - (self.total_steps / cutoff_timestep))
+            self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) * (1 - (self.total_steps / cutoff_timestep))
             
             # scaled_action[0] *= min((self.total_steps / cutoff_timestep),1) # left hip pitch joint
             # scaled_action[3] *= min((self.total_steps / cutoff_timestep),1) # left knee pitch joint
             # scaled_action[6] *= min((self.total_steps / cutoff_timestep),1) # right hip pitch joint
             # scaled_action[9] *= min((self.total_steps / cutoff_timestep),1) # right knee pitch joint
-            scaled_action[0] -= self.nominal_qpos[0] # left hip pitch joint
-            scaled_action[3] -= self.nominal_qpos[3] # left knee pitch joint
-            scaled_action[6] -= self.nominal_qpos[6] # right hip pitch joint
-            scaled_action[9] -= self.nominal_qpos[9] # right knee pitch joint
+            scaled_action[0] -= self.nominal_qpos[7] # left hip pitch joint
+            scaled_action[3] -= self.nominal_qpos[10] # left knee pitch joint
+            scaled_action[6] -= self.nominal_qpos[13] # right hip pitch joint
+            scaled_action[9] -= self.nominal_qpos[16] # right knee pitch joint
 
     
         # initialize reward value
