@@ -43,7 +43,8 @@ ARG CACHEBUST=1
 # Clone & setup repo - fixed version per image is standard practice, so try this
 RUN git clone https://github.com/Lavansurendra/berkeley_humanoid.git && \
     cd berkeley_humanoid && \
-    git pull 
+    git checkout temp-CHTC && \
+    git pull origin temp-CHTC
 RUN mv berkeley_humanoid workspace
 
 RUN date > /image_build_date.txt
