@@ -71,7 +71,7 @@ def main():
     
     # Hyperparams
     #parser.add_argument("--policy_type", type=str, default="MlpPolicy", help="NN architecture (e.g., MlpPolicy)")
-    parser.add_argument("--learning_rate", type=float, default=2e-3, help="Initial learning rate")
+    parser.add_argument("--learning_rate", type=float, default=3e-3, help="Initial learning rate")
     parser.add_argument("--n_steps", type=int, default=2048, help="# of timeSTEPS (NOT TIMES!) per environment per rollout")
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--n_epochs", type=int, default=10, help="# of epochs")
@@ -153,7 +153,7 @@ def main():
         n_epochs=config["n_epochs"],
         gamma=config["gamma"],
         clip_range=0.2,
-        ent_coef=0.001,
+        ent_coef=0.005,
         verbose=1,
         tensorboard_log=f"output/logs/{run.id}", 
         device="cpu"
