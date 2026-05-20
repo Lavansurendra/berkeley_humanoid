@@ -133,6 +133,7 @@ def main():
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv,
+        seed=1
     )
 
     env = VecNormalize(

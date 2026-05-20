@@ -42,6 +42,8 @@ def main():
     print(f"[INFO] Loading Trained PPO Policy...")
     model = PPO.load(model_path, env=env)
 
+    env.seed(1)
+
     print("[INFO] Starting Evaluation Loop...")
     obs = env.reset()
     
