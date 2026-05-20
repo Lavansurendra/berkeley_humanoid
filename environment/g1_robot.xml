@@ -15,7 +15,7 @@
       <default class="collision">
         <geom group="3" type="mesh"/>
         <default class="foot">
-          <geom type="sphere" size="0.005" priority="1" friction="1 0.06 0.01" condim="4"/>
+          <geom type="sphere" size="0.005" priority="1" friction="1 0.06 0.01" condim="3"/>
         </default>
       </default>
     </default>
@@ -372,17 +372,17 @@
 
     <key name="crouch"
       qpos="
-      0 0 0.8
+      0 0 0.79
       1 0 0 0
-      -0.15 0 0 0.3 -0.2 0
-      -0.15 0 0 0.3 -0.2 0
+      -0.15 0 0 0.3 -0.15 0
+      -0.15 0 0 0.3 -0.15 0
       0 0 0
       0.2 0.2 0 1.28 0 0 0
       0.2 -0.2 0 1.28 0 0 0
       "
       ctrl="
-      -0.15 0 0 0.3 -0.2 0
-      -0.15 0 0 0.3 -0.2 0
+      -0.15 0 0 0.3 -0.15 0
+      -0.15 0 0 0.3 -0.15 0
       0 0 0
       0.2 0.2 0 1.28 0 0 0
       0.2 -0.2 0 1.28 0 0 0
