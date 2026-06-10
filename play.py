@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 
 from stable_baselines3 import PPO
@@ -11,13 +12,18 @@ from environment.g1_env import G1Env
 def main():
     # 1. Update the XML path to the new assets folder
     xml_path = "environment/g1_scene.xml"
-    
+
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "g1_final_4000000"
-    
+    if len(sys.argv) > 0:
+       model_name = sys.argv[1][:-4] # Remove .zip
+    else : 
+        print('[ERROR] missing model name') 
+        return    
+
+    timesteps = model_name[9:] 
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "g1_vecnormalize_4000000.pkl")
+    stats_path = os.path.join(models_dir, f'g1_vecnormalize_{timesteps}.pkl')
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
