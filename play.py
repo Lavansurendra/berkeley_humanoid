@@ -16,13 +16,14 @@ def main():
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
     if len(sys.argv) > 0:
-       model_name = sys.argv[0] 
+       model_name = sys.argv[1][:-4] # Remove .zip
     else : 
         print('[ERROR] missing model name') 
         return    
- 
+
+    timesteps = model_name[9:] 
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "g1_vecnormalize_200000.pkl")
+    stats_path = os.path.join(models_dir, f'g1_vecnormalize_{timesteps}.pkl')
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
