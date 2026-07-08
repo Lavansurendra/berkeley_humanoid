@@ -2,10 +2,12 @@ import gymnasium as gym
 from gymnasium import spaces
 import mujoco
 import numpy as np
+import time
 
 
 class G1Env(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
+    viewer_exists = False
 
     def __init__(self, xml_path, render_mode=None):
         
@@ -140,24 +142,56 @@ class G1Env(gym.Env):
 
         # initialize property values for the desired behaviour of the robot, the action number in the episode in which the desired behaviour switched from standing to walking, and a counter to hold how long the robot has been successfully standing for
             # for the desired behaviour property, 0 indicates the desired behaviour is standing still and 1 indicates the desired behaviour is walking
-        self.desired_behaviour = 0
+        self.desired_behaviour = 1
         self.des_bhve_switch_action_num = None
         self.stable_stand_count = 0
 
         # initializing the previous action to be the nominal position of the joints so that the action difference penalty is 0 at the first step and the learning policy does not get penalized for its first action being very different from the nominal pose
         self.previous_action = self.nominal_qpos[7:]
 
-        # set up the properties needed to launch the viewer if desired
-        self.render_mode = render_mode
-        if self.render_mode == "human":
-            from mujoco import viewer
-            self.viewer = viewer.launch_passive(self.model, self.data)
 
-            self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
-            self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
+        # ================================================== Start of Viewer Code for Visualization ==================================================
+
+        # intializing parameters for the mujoco viewer to track what render mode we are using (human in play file and None in train file), and the state of simulation we wish to be in (whether we want the viewer to be paused, faster or slower, etc.)
+            # NOTE: the self.render_mode parameter is used to define what viewer mode we are using (we use the mode human when we want the simulation to run continuously in an interactive way (play.py) and the mode None when we want to not generate any visual rendering at all (train.py))
+            # NOTE: the self.paused parameter is a boolean flag that is used to pause the simulation by preventing any physics steps from being taken while still allowing us to pan around the simulation with the viewer's camera
+            # NOTE: the self.speed_multipier is a value which represents the ratio of real world speed to the real-world time
+            # NOTE: the self.last_render_time uses time.time() to record the exact time an update to the viewer occured which we then compare to the time at the next update to determine whether we need to adjust the computation time so that updates are made only in real time
+            # NOTE: the self.physics_time_simulated is a value which represents how much time has passed in the physics simulation
+        self.render_mode = render_mode
+        self.paused = False
+        self.speed_multiplier = 1.0
+        self._last_render_time = time.time()
+        self._physics_time_simulated = 0.0
+
+        # if the user indicates that they want the viewer of the environment to open:
+        if self.render_mode == "human":
+
+            # dummyvecenv from the play file can open a viewer on it's own and if it does we don't want to open a second viewer
+            if not G1Env.viewer_exists:
+
+                # importing the viewer module from python to view the physics simulation
+                    # NOTE: it is neccesary that this import is not at the top of the file as it requires a graphics library which cannot be used without a graphics card and so in cloud computing or CHTC this import would fail
+                from mujoco import viewer
+
+                # launching the physics simulation so that we can actually visualize the robot
+                    # NOTE: due to the condition above this only occurs when the render_mode is specifed as human which occurs in the play.py file and so rendering does not occur during training
+                self.viewer = viewer.launch_passive(self.model, self.data, key_callback = self.key_callback)
+                self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
+                self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
+
+                # setting the class parameter to be true so that no secondary viewers are launched 
+                G1Env.viewer_exists = True
+
+            else:
+                # if another instance of the viewer was initialized by the G1Env we don't create another one
+                self.viewer = None 
 
         else:
             self.viewer = None
+
+        # =================================================== End of Viewer Code for Visualization ===================================================
+
 
     def step(self, action):
         '''
@@ -170,13 +204,39 @@ class G1Env(gym.Env):
 
         '''
         
+        # ================================================== Start of Viewer Code for Visualization ==================================================
+
+        # if we are viewing the simulation using render_mode human (like we do in the play.py file) and the viewer is currently active we want to pause with a while loop for as long as the self.paused parameter is True (until the space bar is pressed again to unpause)
+        if self.render_mode == "human" and self.viewer is not None:
+
+            while self.paused and self.viewer.is_running():
+                
+                # forcing the viewer to refresh updating the viewer while keeping all objects frozen
+                self.viewer.sync()
+
+                # this function updates the position of all objects int he simulation without stepping physics time forward so that any mouse interaction with the robot can be visualized
+                mujoco.mj_forward(self.model, self.data)
+
+                # this loop could in theory run much faster in python than mujoco would be able to update the simulator and so we include this line in order to cap the rate the loop runs at so that we can render at 60 FPS which is more than enough for the paused viewer
+                time.sleep(1 / 60.0)
+                
+                # updating the last_render_time parameter constantly as we render the simulator so that once unpaused the later reference to last_render_time (at the bottom of the step function) does not cause the simulator to fast forward to a later part of the simulation
+                self._last_render_time = time.time()
+
+                # reseting the record of how much time the simulation has been going for so that the speed multiplier code later on restarts when spacebar is clicked to resume
+                self._physics_time_simulated = 0.0
+        
+        # =================================================== End of Viewer Code for Visualization ===================================================
+
+
+
         # we will use the total_steps variable to track how many steps the agent has taken across all episodes, and use that to scale the difficulty of the random pushes over time. 
         # this way, the agent starts with easier conditions and gradually faces more challenging perturbations as it learns.
         self.total_steps += 1
                 
         # define a vector to contain the factors by which corrections will be applied to each actuator
-        correction_scaling = np.array([0.15, 0, 0.05, 0.15, 0.2, 0.01,
-                                       0.15, 0, 0.05, 0.15, 0.2, 0.01,
+        correction_scaling = np.array([0.3, 0, 0.05, 0.15, 0.2, 0.01,
+                                       0.3, 0, 0.05, 0.15, 0.2, 0.01,
                                        0, 0, 0,
                                        0, 0, 0, 0, 0, 0, 0,
                                        0, 0, 0, 0, 0, 0, 0])
@@ -212,8 +272,8 @@ class G1Env(gym.Env):
                 self.data.xfrc_applied[self.pelvis_id, 1] = force_y
 
             # adding a spike push on the pelvis at the initial time which decays overtime 
-            if self.step_count <= self.des_bhve_switch_action_num + 160:
-                self.data.xfrc_applied[self.pelvis_id, 0] += 20 * np.sin(2*np.pi * ((self.step_count - self.des_bhve_switch_action_num)/320))
+            # if self.step_count <= self.des_bhve_switch_action_num + 160:
+            #     self.data.xfrc_applied[self.pelvis_id, 0] += 20 * np.sin(2*np.pi * ((self.step_count - self.des_bhve_switch_action_num)/320))
 
             # apply a upwards force that originally cancels out the weight of the robot but over time gradually transfers the weight to the robot
             # self.data.xfrc_applied[self.pelvis_id, 1] = 0.0
@@ -221,15 +281,15 @@ class G1Env(gym.Env):
             # self.data.xfrc_applied[self.pelvis_id, 4] = 0.0
             # self.data.xfrc_applied[self.pelvis_id, 1] = -50 * self.data.qpos[1] * (1 - (self.total_steps / cutoff_timestep))
             # self.data.xfrc_applied[self.pelvis_id, 2] = 50 * (1 - (self.total_steps / cutoff_timestep))
-            self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7])) # * (1 - (self.total_steps / cutoff_timestep))
+            # self.data.xfrc_applied[self.pelvis_id, 4] = -50 * np.arccos(np.dot(np.array([1,0,0,0]), self.data.qpos[3:7]))
 
             # apply a positive force in the x direction to force the robot to move forward and maintain it's balance
             self.data.xfrc_applied[self.pelvis_id, 0] += 20
             
-            scaled_action[0] -= self.nominal_qpos[7] # left hip pitch joint
-            scaled_action[3] -= self.nominal_qpos[10] # left knee pitch joint
-            scaled_action[6] -= self.nominal_qpos[13] # right hip pitch joint
-            scaled_action[9] -= self.nominal_qpos[16] # right knee pitch joint
+            # scaled_action[0] -= self.nominal_qpos[7] # left hip pitch joint
+            # scaled_action[3] -= self.nominal_qpos[10] # left knee pitch joint
+            # scaled_action[6] -= self.nominal_qpos[13] # right hip pitch joint
+            # scaled_action[9] -= self.nominal_qpos[16] # right knee pitch joint
 
 
         # --- PHYSICS LOOP ---
@@ -245,7 +305,8 @@ class G1Env(gym.Env):
             # initialize variables to hold the behvaiour dependent penalties
             p_forward = 0
             p_stand_jitter = 0
-            p_target_pose = 0
+            r_target_pose = 0
+            p_foot_slide = 0
 
             # if the desired behaviour is standing still, calculate the jitter penalty
             if self.desired_behaviour == 0:
@@ -256,41 +317,67 @@ class G1Env(gym.Env):
             # if the desired behaviour is walking, calculate the limb positions
             elif self.desired_behaviour == 1:
 
-                # initialize a variable to hold the current time
-                curr_time = (self.step_count - self.des_bhve_switch_action_num) + phys_timestep/num_timesteps
+                # initialize a variable to hold the time relative to the start of the gait
+                rel_time = (self.step_count - self.des_bhve_switch_action_num) + phys_timestep/num_timesteps
+
+                # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
+                    # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
+                    # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
+                left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
+                right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
+
+                # contact force from touch sensors on the feet
+                    # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
+                left_foot_force = self.data.sensor("left_foot_touch").data[0]
+                right_foot_force = self.data.sensor("right_foot_touch").data[0]
+
+
+                # pelvis position target equation logic
+                    # because we switched to the force replacement logic and because of the way the axis are defined, the force acts in the direction we want the object to move (displacement between timesteps) a quarter period later since we modelled the system as a pendulum with a restoring force
+                    # this means that the force is phase shifted by a quarter period with the velocity (the velocity lags the force by a quarter period (v_phase_shift = -tau/4) assuming sinusoid equation in sin(2pi*(x+phase_shift)) )
+                    # however, because we know from the motion of a pendulum that the velocity is phase shifted with the position by another quarter period
+                    # so, the force is phase shifted a half period with the position (x_phase_shift = -tau/2)
+                    # in other words, the force acts in the direction opposite to the direction of the displacement from equilibrium (not displacement between timesteps)
+                    # and, the pelvis position equation was derived in this way from the force equations
+                    # TODO: fix this comment
+                # pelvis_target = 0.06 * (-np.cos((2*np.pi) * ((rel_time))/40))
+                pelvis_target = 0.06 * ((-1) ** (-np.cos((2*np.pi) * ((rel_time))/40) < 0))
 
                 # determine what the target positions of the robot should be at the current timestep for the pitch motors of the thighs and knees for a walking gait
-                left_thigh_target = np.deg2rad(15*np.cos(2*np.pi * ((curr_time)/40)) - 10)
-                right_thigh_target = np.deg2rad(15*np.cos(2*np.pi * ((curr_time - 20)/40)) - 10)
-                left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((curr_time - 5)/40))) + 5)
-                right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((curr_time - 20 - 5)/40))) + 5)
+                # left_thigh_target = np.deg2rad(15*np.cos(2*np.pi * ((rel_time)/40)) - 10)
+                # right_thigh_target = np.deg2rad(15*np.cos(2*np.pi * ((rel_time - 20)/40)) - 10)
+                # left_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((rel_time - 5)/40))) + 5)
+                # right_knee_target = np.deg2rad(25 * max(0, np.sin(2*np.pi * ((rel_time - 20 - 5)/40))) + 5)
+                left_thigh_target = np.deg2rad((-1) ** ((15*np.cos(2*np.pi * ((rel_time)/40)) - 10) < 0))
+                right_thigh_target = np.deg2rad((-1) ** ((15*np.cos(2*np.pi * ((rel_time - 20)/40)) - 10) < 0))
+                left_knee_target = np.deg2rad(25 * (max(0, np.sin(2*np.pi * ((rel_time - 20 + 5)/40))) > 0) + 5)
+                right_knee_target = np.deg2rad(25 * (max(0, np.sin(2*np.pi * ((rel_time + 5)/40))) > 0) + 5)
 
-                # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
-                new_scaled_action[0] += left_thigh_target
-                new_scaled_action[3] += left_knee_target
-                new_scaled_action[6] += right_thigh_target
-                new_scaled_action[9] += right_knee_target
+                # determine what the target heights of the robot's feet should be
+                # left_foot_target_height = max(0, 0.04 * np.sin(2*np.pi * ((rel_time + 10)/40)))
+                # right_foot_target_height = max(0, 0.04 * np.sin(2*np.pi * ((rel_time - 10)/40)))
+                left_foot_target_height = 0.1 * (max(0, 0.04 * np.sin(2*np.pi * ((rel_time + 10)/40))) > 0)
+                right_foot_target_height = 0.1 * (max(0, 0.04 * np.sin(2*np.pi * ((rel_time - 10)/40))) > 0)
+
+                # # add the target positions for the thigh and knee pitch joints for a walking gait to the corresponding elements of the scaled action vector so that the final target position for these joints is a combination of the target position for a walking gait and the correction outputted by the policy
+                # new_scaled_action[0] += left_thigh_target
+                # new_scaled_action[3] += left_knee_target
+                # new_scaled_action[6] += right_thigh_target
+                # new_scaled_action[9] += right_knee_target
 
                 # calculate the penalty for the velocity of the robot not being the desired velocity
+                # p_forward = forward_motion_reward(self.data.qvel[0])
                 p_forward = velocity_tracking_penalty(self.data.qvel[0])
 
                 # calculate the penalty for the current position not being the target position
-                p_target_pose = target_pose_deviation_penalty(self.data.qpos, curr_time, left_thigh_target, right_thigh_target, left_knee_target, right_knee_target)
+                r_target_pose = target_pose_deviation_penalty(self.data.qpos, left_foot_height, right_foot_height, pelvis_target, left_thigh_target, right_thigh_target, left_knee_target, right_knee_target, left_foot_target_height, right_foot_target_height)
 
+                # calculate the penalty for foot slide
+                # p_foot_slide = foot_slide_penalty(self.model, self.data, left_foot_force, right_foot_force)
 
-            # # height of feet sites in xml files given by a distance sensor (measuring distance between the foot body and the ground geom)
-            #     # NOTE: 0 when foot is on the ground, increases as foot gets higher off the ground (target estimate visual: 0.07)
-            #     # NOTE: to see the feet sites in the viewer go to the rendering tab and toggle site 5 on
-            # left_foot_height = self.data.sensor("left_foot_to_ground").data[0]
-            # right_foot_height = self.data.sensor("right_foot_to_ground").data[0]
-            
-            # # contact force from touch sensors on the feet
-            #     # NOTE: ~ 160 when foot is on the ground, decreases as foot gets higher off the ground (values around 30 when fallen over backwards, values around 20 when fallen over forwards)
-            # left_foot_force = self.data.sensor("left_foot_touch").data[0]
-            # right_foot_force = self.data.sensor("right_foot_touch").data[0]
 
             # calculate reward terms
-            r_alive = alive_reward(self.data.qpos[2])
+            # r_alive = alive_reward(self.data.qpos[2])
             # # calculate foot lift reward proportional to height of foot above floor
             # r_foot_lift = foot_lift_reward(left_foot_height, right_foot_height)
             # # calculate foot target penalty for keeping feet on the ground or lifting them too high
@@ -299,25 +386,31 @@ class G1Env(gym.Env):
             # r_foot_contact = foot_contact_reward(left_foot_force, right_foot_force)
             
             # calculate penatly terms
-            p_zvel = pelvis_zvel_penalty(self.data.qvel[2])
-            p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7], self.data.qvel[3:6])
+            # p_zvel = pelvis_zvel_penalty(self.data.qvel[2])
+            # p_pelvis_orientation = pelvis_orientation_penalty(self.data.qpos[3:7], self.data.qvel[3:6])
 
             # reward term weights
             w_alive = 1
-            w_stand_jitter = 0.4
-            w_velocity = 0.06
-            w_zvel = 0.1
-            w_pelvis_orientation = 0.1
-            w_target_pose = 0.25
+            w_stand_jitter = 0.4 # TODO: fix this or the jitter penalty or something so that the policy can learn to stand and then transition from standing to walking when the desired behaviour switches
+            w_velocity = 0.5
+            w_zvel = 1
+            w_pelvis_orientation = 1
+            w_target_pose = 20
+            w_foot_slide = 0.05
 
             # add to reward
-            total_reward += w_alive*r_alive + w_stand_jitter*p_stand_jitter + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_velocity*p_forward + w_target_pose*p_target_pose
+            total_reward += w_velocity*p_forward + w_target_pose*r_target_pose
+            # total_reward += w_alive*r_alive + w_velocity*p_forward + w_target_pose*r_target_pose
+            # total_reward += w_alive*r_alive + w_stand_jitter*p_stand_jitter + w_zvel*p_zvel + w_pelvis_orientation*p_pelvis_orientation + w_velocity*p_forward + w_target_pose*p_target_pose + w_foot_slide*p_foot_slide
             
             # provide target angular positions to the PD controllers in the xml file by writing to mj.ctrl
             self.data.ctrl[:] = new_scaled_action
 
             # Step physics
             mujoco.mj_step(self.model, self.data)
+
+            # add the simulation time for this step to the property for rendering
+            self._physics_time_simulated += self.model.opt.timestep
         
 
         # check to see if the desired behaviour should be switched from standing still to walking
@@ -336,6 +429,7 @@ class G1Env(gym.Env):
 
                     # switch the desired behaviour from standing still to walking
                     self.desired_behaviour = 1
+                    print("switch")
 
                     # save the time (action number) at which the desired behaviour switch occured
                         # TODO: check if this is right
@@ -365,28 +459,57 @@ class G1Env(gym.Env):
         # collect a new observation to be supplied to the learning policy (and everything else) at the beginning of the computation stage of the next time
         obs = self._get_obs()
 
-        # ================== Episode Termination Code ===========================
+        # ==================================== Episode Termination Code ====================================
         
         # record the z height of the pelvis
             # NOTE: the pelvis is the freejoint of the unitree robot and it's z height is saved at index 2 of the qpos vector 
-        pelvis_z = self.data.qpos[2] 
-        
-        # check the termination conditions to see if the current epsiode needs to be terminated
-        if self.render_mode == "human":
-            
-            # sync the new state to the viewer
+        pelvis_z = self.data.qpos[2]
+
+        # if we are running the viewer with the view mode human (which happens in the play.py file but not in the train.py file during training) we can update the viewer
+        if self.render_mode == "human" and self.viewer and self.viewer.is_running():
+
+            # updating the viewer
             self.viewer.sync()
+
+            # calculating how much real-world time has passed while the calculations of the step function were beindg done using the last render time parameter
+            elapsed_real_world_time = time.time() - self._last_render_time
             
+            # calculating how long this step should take in the viewer depending on our speed multiplier parameter
+            target_real_world_time = self._physics_time_simulated / self.speed_multiplier
+            
+            # pausing physics calculations for accuracy to real time so that more calculations are not done artificially speeding up the simulation time
+            sleep_time = target_real_world_time - elapsed_real_world_time
+
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+            # resetting clock tracking for the next environment step
+            self._last_render_time = time.time()
+            self._physics_time_simulated = 0.0
+
             # Playback mode: Never reset, let it run infinitely
             terminated = False
             truncated = False
+            # terminated = bool(pelvis_z < 0.5) + bool(pelvis_z > 1)
+            # truncated = self.step_count >= 1000
+
         else:
             
             # Training mode: Reset on fall or at 1000 steps
             terminated = bool(pelvis_z < 0.5) + bool(pelvis_z > 1)
-            truncated = self.step_count >= 1000 
+            truncated = self.step_count >= 1000
         
-        return obs, total_reward, terminated, truncated, {}
+        # 
+        info = {
+                # "reward/alive": w_alive * r_alive,
+                # "penalty/stand_jitter": w_stand_jitter * p_stand_jitter,
+                # "penalty/zvel": w_zvel * p_zvel,
+                # "penalty/pelvis_orientation": w_pelvis_orientation * p_pelvis_orientation,
+                "penalty/velocity": w_velocity * p_forward,
+                "reward/target_pose": w_target_pose * r_target_pose
+            }
+
+        return obs, total_reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -412,7 +535,7 @@ class G1Env(gym.Env):
         self.step_count = 0
 
         # reset the desired behaviour indicator, the counter indicating how many consecutive actions the robot has stood still for, and the time at which the desired behaviour switched from standing to walking
-        self.desired_behaviour = 0
+        self.desired_behaviour = 1
         self.stable_stand_count = 0
         self.des_bhve_switch_action_num = 0
         
@@ -447,7 +570,48 @@ class G1Env(gym.Env):
         qvel = self.data.qvel[0:35]
         
         return np.concatenate([desired_behaviour, qpos, qvel]).astype(np.float32)
+    
 
+    # defining a callback function (which is a function (in this case key_callback) passed as an argument to another function (in this case viewer.launch_passive)) which is triggered exclusively when the user presses a key with the mujoco window focused, the character corresponding to this key
+    # is then passed by mujoco to the function key_callback which can then modify aspects of the simulation
+    def key_callback(self, keycode):
+        
+        # We define char immediately so it exists in this scope
+        try:
+            char = chr(keycode).lower()
+        except Exception as e:
+            return
+
+        # converting the character provided by mujoco (which is an ASCII integer) into a readable string
+        char = chr(keycode).lower()
+
+        # using the space bar to set the paused parameter to true
+        if char == ' ':
+            self.paused = not self.paused
+
+        # using the + key to speed up simulation
+        elif char == '=' or char == '+':
+            self.speed_multiplier *= 1.5
+        
+        # using the - key to slow down simulation
+        elif char == '-':
+            self.speed_multiplier /= 1.5
+            
+            # NOTE: we use max here to make sure the speed is never set to 0
+            self.speed_multiplier = max(0.01, self.speed_multiplier)
+    
+    
+    def close(self):
+
+        # if the viewer was launched this code shuts down the viewer
+        if self.viewer is not None:
+            # stopping the rendering thread
+            self.viewer.close()
+            # explicitly setting the viewer to None to free up the memory used by it 
+            self.viewer = None
+        
+        # calling the close method of gym.Env
+        super().close()        
 
 # ======================================================= State Assessment =========================================================
 
@@ -543,7 +707,7 @@ def stand_jitter_penalty(qvel, lower_bounds, upper_bounds):
 
 def velocity_tracking_penalty(forward_velocity, target_velocity=1.0):
 
-    velocity_error = abs(forward_velocity - target_velocity)
+    velocity_error = (forward_velocity - target_velocity) ** 2
     return -velocity_error
 
 def pelvis_zvel_penalty(pelvis_zvel):
@@ -572,18 +736,33 @@ def pelvis_orientation_penalty(pelvis_orientation, pelvis_angular_velocity, targ
 
 #     return -pose_deviation
 
-def target_pose_deviation_penalty(qpos, curr_time, left_thigh_target, right_thigh_target, left_knee_target, right_knee_target):
+def target_pose_deviation_penalty(qpos, left_foot_height, right_foot_height, pelvis_target, left_thigh_target, right_thigh_target, left_knee_target, right_knee_target, left_foot_target, right_foot_target):
 
-    # pelvis position target equation logic
-        # because we switched to the force replacement logic and because of the way the axis are defined, the force acts in the direction we want the object to move (displacement between timesteps) a quarter period later since we modelled the system as a pendulum with a restoring force
-        # this means that the force is phase shifted by a quarter period with the velocity (the velocity lags the force by a quarter period (v_phase_shift = -tau/4) assuming sinusoid equation in sin(2pi*(x+phase_shift)) )
-        # however, because we know from the motion of a pendulum that the velocity is phase shifted with the position by another quarter period
-        # so, the force is phase shifted a half period with the position (x_phase_shift = -tau/2)
-        # in other words, the force acts in the direction opposite to the direction of the displacement from equilibrium (not displacement between timesteps)
-        # and, the pelvis position equation was derived in this way from the force equations 
-    pelvis_target = 0.06 * (-np.cos((2*np.pi) * ((curr_time))/40))
+    '''
+    outputs at min 6.3 
+    '''
 
-    return - ((abs(qpos[1] - pelvis_target)/0.12) + (abs(qpos[7] - left_thigh_target)/30) + (abs(qpos[13] - right_thigh_target)/30) + (abs(qpos[10] - left_knee_target)/50) + (abs(qpos[16] - right_knee_target)/50))
+    # initialize variables to hold the error terms for each joint
+    pelvis_error = abs(qpos[1] - pelvis_target) * 10 # / 0.12
+    lt_error = abs(qpos[7] - left_thigh_target)# / 30
+    rt_error = abs(qpos[13] - right_thigh_target)# / 30
+    lk_error = abs(qpos[10] - left_knee_target)# / 25
+    rk_error = abs(qpos[16] - right_knee_target)# / 25
+    lf_error = abs(left_foot_height - left_foot_target) * 10 # / 0.04
+    rf_error = abs(right_foot_height - right_foot_target) * 10 # / 0.04
+
+    # print("=================================")
+    # print(f"pelvis_error: {pelvis_error}")
+    # print(f"lt_error: {lt_error}")
+    # print(f"rt_error: {rt_error}")
+    # print(f"lk_error: {lk_error}")
+    # print(f"rk_error: {rk_error}")
+    # print(f"lf_error: {lf_error}")
+    # print(f"rf_error: {rf_error}")
+    # print("=================================")
+    
+    return 3 - (pelvis_error + lt_error + rt_error + lk_error + rk_error + lf_error + rf_error)
+    # return 5 - (pelvis_error + lt_error + rt_error + lk_error + rk_error) + ((1 - lf_error) * (left_foot_target > 0) * left_foot_height) + ((1 - rf_error) * (right_foot_target > 0) * right_foot_height)
 
 
 def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right_foot_force, contact_threshold=50.0):
@@ -599,42 +778,33 @@ def foot_lift_reward(left_foot_height, right_foot_height, left_foot_force, right
 
     return left_foot_reward + right_foot_reward
 
-def foot_target_penalty(left_foot_height, right_foot_height, left_foot_force, right_foot_force, target_height=0.07, contact_threshold=50.0):
 
-    # check if either foot is off the ground
+def foot_slide_penalty(model, data, left_foot_force, right_foot_force, contact_threshold=50.0):
+
+    # check if the feet are currently holding the robot's weight
         # NOTE: we assume a foot is off the ground if it's contact force is above a threshold
-    left_foot_force_below_threshold = left_foot_force < contact_threshold
-    right_foot_force_below_threshold = right_foot_force < contact_threshold
+    left_foot_force_above_threshold = left_foot_force > contact_threshold
+    right_foot_force_above_threshold = right_foot_force > contact_threshold
 
-    # penalty for distance from feet target height
-    left_foot_reward = -abs(left_foot_height - target_height) * left_foot_force_below_threshold
-    right_foot_reward = -abs(right_foot_height - target_height) * right_foot_force_below_threshold
+    # get the id for the sites corresponding to each foot in the xml
+    left_foot_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "left_foot")
+    right_foot_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "right_foot")
 
-    return left_foot_reward + right_foot_reward
+    # initialize arrays to hold the velocities for each site
+    left_foot_vel = np.zeros(6)
+    right_foot_vel = np.zeros(6)
 
+    # calculate the values of the velocity for each foot site using the cvel array in data which gives the 6D spatial velocity (3 rot, 3 lin) for each body
+        # NOTE: calling this function places the calculated velocity values for the specified site into the left_foot_vel and right_foot_vel arrays from the previous step
+        # NOTE: in this function the 3rd parameter specifies that the id passed in the 4th element specifically refers to a site and not a body or geom
+        # NOTE: in this function the 6th parameter specifies that we want the velocity in the global frame of reference rather than the local frame of reference of the foot
+    mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_SITE, left_foot_id, left_foot_vel, 0)
+    mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_SITE, right_foot_id, right_foot_vel, 0)
 
+    # calculate the translational velocity penalty for each foot as the sum of the absolute values of the translational velocity in the x and y directions
+    left_foot_slide_x_penalty = np.sum(np.abs(left_foot_vel[3])) * left_foot_force_above_threshold # translational velocity of the left foot in the x direction
+    left_foot_slide_y_penalty = np.sum(np.abs(left_foot_vel[4])) * left_foot_force_above_threshold # rotational velocity of the left foot in the y direction
+    right_foot_slide_x_penalty = np.sum(np.abs(right_foot_vel[3])) * right_foot_force_above_threshold # translational velocity of the right foot in the x direction
+    right_foot_slide_y_penalty = np.sum(np.abs(right_foot_vel[4])) * right_foot_force_above_threshold # translational velocity of the right foot in the y direction
 
-def feet_slide_reward(model, data, foot_body_ids, action):
-
-    sliding_penalty = 0.0
-    
-    for foot_id in foot_body_ids:
-        # Check if foot is in contact with the floor
-        # MuJoCo handles contacts differently; we iterate through the contact array
-        in_contact = False
-        for i in range(data.ncon):
-            contact = data.contact[i]
-            if contact.geom1 == foot_id or contact.geom2 == foot_id:
-                in_contact = True
-                break
-                
-        if in_contact:
-            # Get linear velocity of the foot
-            # data.cvel gives 6D spatial velocity (3 rot, 3 lin) for each body
-            foot_vel = data.cvel[foot_id][3:5] # X and Y velocity
-            vel_norm = np.linalg.norm(foot_vel)
-            
-            # Penalize the magnitude of velocity while in contact
-            sliding_penalty += vel_norm
-            
-    return -sliding_penalty # Negative because it's a penalty
+    return - (left_foot_slide_x_penalty + left_foot_slide_y_penalty + right_foot_slide_x_penalty + right_foot_slide_y_penalty)

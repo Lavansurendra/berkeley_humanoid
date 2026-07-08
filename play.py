@@ -14,10 +14,10 @@ def main():
     
     # 2. Update model paths to point to the new output/models directory
     models_dir = "output/models"
-    model_name = "g1_final_4000000"
+    model_name = "g1_final_12000000"
     
     model_path = os.path.join(models_dir, model_name) # No .zip needed for PPO.load
-    stats_path = os.path.join(models_dir, "g1_vecnormalize_4000000.pkl")
+    stats_path = os.path.join(models_dir, "g1_vecnormalize_12000000.pkl")
     
     print(f"[INFO] Loading MuJoCo Environment...")
     
@@ -42,7 +42,24 @@ def main():
     print(f"[INFO] Loading Trained PPO Policy...")
     model = PPO.load(model_path, env=env)
 
+    env.seed(1)
+
     print("[INFO] Starting Evaluation Loop...")
+    try:
+        
+        obs = env.reset()
+        
+        while True:
+            action, _states = model.predict(obs, deterministic=True)
+            obs, reward, done, info = env.step(action)
+            # No manual sleep needed here anymore!
+    
+    except KeyboardInterrupt:
+        print("[INFO] Shutting down...")
+    
+    finally:
+        env.close() # This will now reach your G1Env.close() and kill the viewer    
+    
     obs = env.reset()
     
     raw_env = env.venv.envs[0].unwrapped
@@ -56,9 +73,6 @@ def main():
 
         time.sleep(0.05)
 
-        # compute_time = time.time() - start_time
-        # if compute_time < dt:
-        #     time.sleep(dt - compute_time)
 
 if __name__ == "__main__":
     main()

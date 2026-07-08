@@ -41,6 +41,32 @@ class HumanoidCheckpointCallback(BaseCallback):
             if self.verbose > 0:
                 print(f"[CHECKPOINT] Saved model and stats at step {step_count}")
         return True
+    
+class RewardLoggingCallback(BaseCallback):
+    """
+    A custom callback class to extract specific reward/penalty metrics from the 
+    step function's info dicts and log them to TensorBoard/Weights & Biases.
+    """
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+
+    def _on_step(self) -> bool:
+        # self.locals["infos"] is the tuple of info dictionaries from all 30 parallel envs
+        infos = self.locals["infos"]
+        
+        # initialize a variable to contain the keys that we want to track so that we can ignore the standard keys added to the info dictionary within SubprocVecEnv
+        keys_to_log = [k for k in infos[0].keys() if k.startswith("reward/") or k.startswith("penalty/")]
+        
+        # iterate through the keys we want to track in weights and biases
+        for key in keys_to_log:
+
+            # calculating the average value of the reward across all 30 environments for this step
+            mean_val = numpy.mean([info[key] for info in infos])
+            
+            # record the results under the env_metrics section of weights and biases
+            self.logger.record_mean(f"env_metrics/{key}", mean_val)
+            
+        return True
 
 def linear_schedule(initial_value: float):
     """
@@ -133,6 +159,7 @@ def main():
         n_envs=args.num_envs,
         env_kwargs={"xml_path": args.xml_path, "render_mode": None},
         vec_env_cls=SubprocVecEnv,
+        seed=1
     )
 
     env = VecNormalize(
@@ -179,8 +206,11 @@ def main():
         verbose=2,
     )
 
+    # 
+    reward_log_callback = RewardLoggingCallback()
+
     # Combine them into a single list
-    callback_list = CallbackList([checkpoint_callback, wandb_callback])
+    callback_list = CallbackList([checkpoint_callback, wandb_callback, reward_log_callback])
 
     print(f"[INFO] Starting Training for {total_timesteps} total timesteps...")
     model.learn(

@@ -19,4 +19,9 @@
   <worldbody>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
   </worldbody>
+
+  <!-- <equality>
+    <weld name="custom" body1="pelvis"/>
+  </equality> -->
+
 </mujoco>
